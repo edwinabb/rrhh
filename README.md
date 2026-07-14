@@ -4,13 +4,15 @@ Sistema full-stack de gestión de recursos humanos (HRMS) para empresas peruanas
 
 ## 📋 Fases del Proyecto
 
-| Fase | Módulo | Estado | Tareas |
-|------|--------|--------|--------|
-| **0** | Fundaciones (Auth, RBAC, Multi-tenancy, Auditoría) | ✅ Completada | - |
-| **1** | Nómina (CTS, gratificaciones, quinta categoría, SUNAT) | 🚀 En Progreso (4/11) | 11 tareas |
-| **2** | Asistencia (Marcaciones, geofencing, horas extra) | ⏳ Pendiente | 8 tareas |
-| **3** | Documental y Firma (Legajo, firma masiva, ESS) | ⏳ Pendiente | 7 tareas |
-| **4** | ATS/Reclutamiento (Pipeline, parsing CVs con IA) | ⏳ Pendiente | 8 tareas |
+| Fase | Módulo | Estado | Tests |
+|------|--------|--------|-------|
+| **0** | Fundaciones (Auth, RBAC, Multi-tenancy, Auditoría) | ✅ Completada | 6 |
+| **1** | Nómina (CTS, gratificaciones, quinta categoría, SUNAT) | ✅ Completada | 37 |
+| **2** | Asistencia (Marcaciones append-only, geofencing, horas extra) | ✅ Completada (feature-complete) | 78 |
+| **3** | Documental (Legajo digital, MinIO, versionado, Ley 29733) | ✅ Completada (MVP) | 24 |
+| **4** | ATS/Reclutamiento (Vacantes, parsing CVs con Claude API) | ✅ Completada (MVP) | 37 |
+
+**Total: 182 tests unitarios pasando (24 suites), TDD estricto.**
 
 ## 🚀 Inicio Rápido
 
@@ -83,23 +85,26 @@ rrhh/
 - **Frontend:** Next.js 14 + TypeScript + Tailwind CSS
 - **IA:** Anthropic Claude Opus 4.8 (parsing CVs)
 
-## 📊 Fase 1 — Nómina (En Progreso)
+## 📊 Módulos Implementados
 
-### Calculadores de Nómina Implementados ✅
+### Fase 1 — Nómina ✅
+Calculadores puros: CTS, Gratificación (Ley 30334), AFP/ONP, EsSalud, Asignación Familiar (Ley 25129), Quinta Categoría (proyección anual progresiva), Utilidades, Liquidación. Orquestador `PayrollRunService`, exportadores PLAME Estructura 18 (SUNAT) y telecrédito BCP.
 
-1. **CtsCalculator** — Depósito semestral (mayo, noviembre) con prorrateo
-2. **GratificacionCalculator** — Gratificación + bonificación extraordinaria Ley 30334
-3. **AfpOnpCalculator** — Retenciones pensionarias (AFP, ONP)
+### Fase 2 — Asistencia ✅ (feature-complete)
+Marcaciones **append-only** (SUNAFIL D.Leg. 910: sin UPDATE/DELETE a nivel BD), geofencing con Haversine, biometría con provider inyectable (mock MVP), justificaciones con flujo de aprobación, horas extra D.Leg. 854 (recargo 25%/35%), resumen diario de asistencia y export de horas computables a nómina.
 
-### Próximas Tareas
+### Fase 3 — Documental ✅ (MVP)
+Legajo digital por empleado, almacenamiento MinIO con interfaz inyectable, versionado de documentos, checksum MD5, soft-delete con motivo (derecho al olvido, Ley 29733), búsqueda y vista de legajo con tipos faltantes.
 
-- [ ] EssaludCalculator + AsignacionFamiliarCalculator
-- [ ] QuintaCategoriaCalculator (proyección anual)
-- [ ] UtilidadesCalculator (reparto por días/remuneración)
-- [ ] LiquidacionCalculator (beneficios truncos al cese)
-- [ ] PayrollRunService (orquestador del ciclo)
-- [ ] PlanillaExporter (archivos PLAME/T-Registro SUNAT)
-- [ ] BankFileExporter (telecrédito BCP)
+### Fase 4 — ATS ✅ (MVP)
+Vacantes y candidatos con consentimiento LPDP obligatorio, parsing de CV con Claude API (conector fetch inyectable, rate limit por tenant), transiciones de estado validadas (aplicado → revisado → entrevista → oferta → contratado/rechazado), notas internas, contratación con vínculo a `Employee` (D.Leg. 728).
+
+### Pendiente (fases futuras)
+- Frontend Next.js (páginas y dashboards)
+- Firmas digitales avanzadas y workflows de aprobación documental (Fase 3+)
+- Scoring de candidatos, pipeline Kanban (Fase 4+)
+- Exportadores bancarios adicionales (BBVA, Interbank, Scotiabank)
+- Estructuras SUNAT adicionales (E04, E05, E11, E14, E15, E26, E30)
 
 ## 🧪 Testing
 
@@ -114,7 +119,7 @@ pnpm --filter @rrhh/api test cts.calculator
 pnpm test:integration
 ```
 
-**Cobertura actual:** 20 tests passed (Fase 0 + Fase 1)
+**Cobertura actual:** 182 tests passed, 24 suites (Fases 0–4)
 
 ## 📚 Documentación
 
