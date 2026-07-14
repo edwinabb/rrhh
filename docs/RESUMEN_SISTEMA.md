@@ -2,7 +2,7 @@
 
 Sistema de Gestión de Recursos Humanos (HRMS) para empresas peruanas, multi-empresa (multi-tenant) y con cumplimiento estricto de la normativa local (SUNAT, SUNAFIL, MTPE, Ley 29733).
 
-**Estado:** Backend Fases 0–4 operativo · 182 tests unitarios (24 suites) · Frontend en estado inicial (login)
+**Estado:** Backend Fases 0–4 operativo · 208 tests unitarios (26 suites) · Frontend completo (8 páginas) · Import/export CSV para sistemas externos
 
 **Repositorio:** https://github.com/edwinabb/rrhh
 
@@ -10,14 +10,17 @@ Sistema de Gestión de Recursos Humanos (HRMS) para empresas peruanas, multi-emp
 
 ## 🖥️ Frontend (Next.js — `localhost:3000`)
 
-El frontend está en su estado mínimo. Tiene **2 páginas**:
+Frontend completo con shell autenticado: sidebar de navegación **filtrado por los permisos RBAC reales de la sesión** (vía `GET /auth/me`), header con rol y logout, redirección automática a `/login` sin sesión.
 
 | Página | Ruta | Funcionalidad |
 |--------|------|---------------|
-| **Home** | `/` | Página de bienvenida con acceso al login. |
-| **Login** | `/login` | Formulario email/contraseña. Autentica contra `POST /api/auth/login` y guarda la sesión en cookie httpOnly (nunca hay token en JavaScript). |
-
-**Todo lo demás se opera hoy por API.** Los dashboards de nómina, asistencia, documentos y ATS son el principal pendiente de frontend.
+| **Login** | `/login` | Email/contraseña → cookie de sesión httpOnly (nunca hay token en JavaScript). |
+| **Dashboard** | `/` | Tarjetas por módulo, filtradas por permisos del usuario. |
+| **Asistencia** | `/asistencia` | Marcar ENTRADA/SALIDA con GPS del navegador (validación de geofence visible), resumen mensual, justificaciones con aprobación gerencial, dashboard de equipo, **import CSV desde sistema biométrico externo**. |
+| **Nómina** | `/nomina` | Procesar planilla del período (con confirmación), exportes PLAME/telecrédito, **import CSV de novedades del período** (días, horas extra, bonos, descuentos). |
+| **Legajo** | `/legajo` | Documentos por empleado agrupados por tipo (faltantes destacados), subida, descarga, eliminación con motivo (soft-delete), búsqueda. |
+| **Reclutamiento** | `/ats` y `/ats/[id]` | Vacantes con estados, registro de candidatos con consentimiento LPDP obligatorio, CV parseado con Claude API, pipeline de estados validado, notas internas, contratación. |
+| **Administración** | `/admin` | Parámetros normativos (nueva versión con vigencia), log de auditoría, empleados. |
 
 ---
 
@@ -43,6 +46,8 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | `POST /payroll/:periodo/procesar` | `payroll.process` | Procesa la planilla del período (ej. `2026-07`): para cada empleado activo calcula remuneración, asignación familiar (Ley 25129), retención AFP/ONP, quinta categoría proyectada, aporte EsSalud, y guarda el detalle por concepto con el neto a pagar. Transiciona la planilla a "procesado". |
 | `GET /payroll/:periodo/export/plame` | `payroll.export` | Exporta la Estructura 18 del PLAME (SUNAT): una línea por concepto `tipo_doc\|num_doc\|código\|devengado\|pagado`. *(Endpoint declarado; la lectura desde BD está pendiente de conectar.)* |
 | `GET /payroll/:periodo/export/telecredito` | `payroll.export` | Genera el archivo de telecrédito BCP para pago masivo de haberes: `documento\|cuenta\|monto`. *(Mismo estado que el anterior.)* |
+| `GET /payroll/import/plantilla` | `payroll.import` | Descarga la plantilla CSV de novedades: `numero_documento,dias_laborados,horas_extra_25,horas_extra_35,bonificaciones,descuentos`. |
+| `POST /payroll/:periodo/import` | `payroll.import` | Importa novedades del período (upsert por empleado+período; re-importar actualiza). El motor las incorpora al procesar: horas extra con recargo sobre el valor-hora del contrato, bonos, descuentos y prorrateo por días laborados. Retorna `{procesadas, omitidas, errores[{fila, mensaje}]}`. |
 
 **Calculadores implementados (funciones puras, testeadas):** CTS, Gratificación (Ley 30334), AFP/ONP, EsSalud, Asignación Familiar, Quinta Categoría (proyección anual progresiva), Utilidades, Liquidación de beneficios sociales.
 
@@ -55,6 +60,8 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | `PUT /attendance/justificaciones/:id/resolver` | `attendance.approve` | El gerente aprueba o rechaza. Al aprobar, el día deja de contar como falta en el resumen. |
 | `GET /attendance/resumen/:periodo` | `attendance.read` | Resumen del período por día: hora entrada/salida, horas trabajadas, tardanza en minutos, faltas y si están justificadas. |
 | `GET /attendance/dashboard/:periodo` | `attendance.read.team` | Vista gerencial agregada del equipo. |
+| `GET /attendance/import/plantilla` | `attendance.import` | Descarga la plantilla CSV para relojes biométricos externos: `numero_documento,fecha,hora,tipo` (una fila por evento). |
+| `POST /attendance/import` | `attendance.import` | Importa marcaciones desde el CSV: crea marcaciones append-only, **deduplica** (re-importar el mismo archivo no duplica), acumula errores por fila sin abortar, y recalcula automáticamente el resumen diario y las horas extra. Retorna `{procesadas, omitidas, errores[{fila, mensaje}]}`. |
 
 **Integración interna:** el módulo exporta horas computables y horas extra (con recargo 25%/35% según D.Leg. 854) hacia el cálculo de nómina.
 
@@ -92,6 +99,7 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Subir documentos | ✓ | ✓ | ✗ | ✗ |
 | Eliminar documentos | ✓ | ✗ | ✗ | ✗ |
 | Gestionar vacantes/candidatos | ✓ | ✓ | ✗ | ✗ |
+| Importar CSV (asistencia/novedades) | ✓ | ✓ | ✗ | ✗ |
 | Parámetros normativos (escribir) | ✓ | ✗ | ✗ | ✗ |
 
 ---
@@ -159,11 +167,14 @@ pnpm --filter @rrhh/web dev   # Web en http://localhost:3000
 
 ## 🗺️ Pendientes (próximo ciclo)
 
-- **Frontend:** dashboards de asistencia, nómina, legajo y ATS (hoy solo existe el login).
+Ver el detalle priorizado en `docs/PENDIENTES.md`. Titulares:
+
 - **Nómina:** conectar los endpoints de exportación PLAME/telecrédito a la lectura real de BD; exportadores para BBVA, Interbank y Scotiabank; estructuras SUNAT adicionales (E04, E05, E11, E14, E15, E26, E30).
+- **Asistencia:** mapeo automático del formato del sistema biométrico chino de la empresa (a la espera del archivo de ejemplo).
+- **IA:** configurar `ANTHROPIC_API_KEY` real para el parsing de CVs.
 - **Documental:** firmas digitales y workflows de aprobación.
 - **ATS:** scoring automático de candidatos y pipeline visual (Kanban).
 
 ---
 
-*Documento generado el 2026-07-14. Estado del código: commit `d77f2e2` en `master`.*
+*Documento actualizado el 2026-07-14. Frontend y CSV verificados en vivo. Estado del código: rama `master`.*

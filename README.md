@@ -12,7 +12,7 @@ Sistema full-stack de gestión de recursos humanos (HRMS) para empresas peruanas
 | **3** | Documental (Legajo digital, MinIO, versionado, Ley 29733) | ✅ Completada (MVP) | 24 |
 | **4** | ATS/Reclutamiento (Vacantes, parsing CVs con Claude API) | ✅ Completada (MVP) | 37 |
 
-**Total: 182 tests unitarios pasando (24 suites), TDD estricto.**
+**Total: 208 tests unitarios pasando (26 suites), TDD estricto. Frontend completo (8 páginas con RBAC) + import/export CSV para sistemas de asistencia externos.**
 
 ## 🚀 Inicio Rápido
 
@@ -99,12 +99,11 @@ Legajo digital por empleado, almacenamiento MinIO con interfaz inyectable, versi
 ### Fase 4 — ATS ✅ (MVP)
 Vacantes y candidatos con consentimiento LPDP obligatorio, parsing de CV con Claude API (conector fetch inyectable, rate limit por tenant), transiciones de estado validadas (aplicado → revisado → entrevista → oferta → contratado/rechazado), notas internas, contratación con vínculo a `Employee` (D.Leg. 728).
 
+### Frontend ✅ (8 páginas)
+Shell autenticado con sidebar filtrado por permisos RBAC (`GET /auth/me`), páginas de Asistencia (marcación GPS + import CSV de relojes biométricos), Nómina (procesar período + import CSV de novedades), Legajo, ATS (pipeline con consentimiento LPDP) y Administración. Credenciales demo: `admin@demo.pe`/`Admin123!`, `rrhh@demo.pe`/`Rrhh123!`, `empleado@demo.pe`/`Empleado123!`.
+
 ### Pendiente (fases futuras)
-- Frontend Next.js (páginas y dashboards)
-- Firmas digitales avanzadas y workflows de aprobación documental (Fase 3+)
-- Scoring de candidatos, pipeline Kanban (Fase 4+)
-- Exportadores bancarios adicionales (BBVA, Interbank, Scotiabank)
-- Estructuras SUNAT adicionales (E04, E05, E11, E14, E15, E26, E30)
+Ver `docs/PENDIENTES.md` para el backlog priorizado: conexión de exportes PLAME/telecrédito a BD, mapeo del sistema biométrico externo, firmas digitales, Kanban ATS, exportadores bancarios adicionales.
 
 ## 🧪 Testing
 
@@ -119,7 +118,7 @@ pnpm --filter @rrhh/api test cts.calculator
 pnpm test:integration
 ```
 
-**Cobertura actual:** 182 tests passed, 24 suites (Fases 0–4)
+**Cobertura actual:** 208 tests passed, 26 suites (Fases 0–4 + import CSV)
 
 ## 📚 Documentación
 
