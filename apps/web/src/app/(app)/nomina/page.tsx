@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth-context';
+import { CsvImportCard } from '@/components/csv-import-card';
 import {
   exportarPlanilla,
   procesarPlanilla,
@@ -178,6 +179,19 @@ export default function NominaPage() {
 
         {resultado && <ResultadoPlanilla resultado={resultado} periodo={periodoProcesado} />}
       </section>
+
+      {/* Novedades del período (import CSV). key: al cambiar el período se
+          descarta el reporte anterior para no confundirlo con otro mes. */}
+      {periodoValido && (
+        <CsvImportCard
+          key={periodo}
+          titulo="Novedades del período (CSV)"
+          descripcion={`Días laborados, horas extra y bonificaciones/descuentos del período ${periodo}`}
+          plantillaUrl="/payroll/import/plantilla"
+          importUrl={`/payroll/${encodeURIComponent(periodo)}/import`}
+          permiso="payroll.import"
+        />
+      )}
 
       {/* Exportaciones */}
       <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">

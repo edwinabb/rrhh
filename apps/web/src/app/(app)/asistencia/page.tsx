@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/components/auth-context';
+import { CsvImportCard } from '@/components/csv-import-card';
 import { fetchEmployees, periodoActual, type EmployeeLite } from './attendance-api';
 import { MarcarCard } from './marcar-card';
 import { ResumenMes } from './resumen-mes';
@@ -86,6 +87,15 @@ export default function AsistenciaPage() {
           onMarcacionRegistrada={() => setRefreshKey((n) => n + 1)}
         />
       )}
+
+      <CsvImportCard
+        titulo="Importar desde sistema externo"
+        descripcion="Formato para relojes biométricos externos: una fila por evento de marcación"
+        plantillaUrl="/attendance/import/plantilla"
+        importUrl="/attendance/import"
+        permiso="attendance.import"
+        onImportado={() => setRefreshKey((n) => n + 1)}
+      />
 
       <ResumenMes
         periodo={periodo}

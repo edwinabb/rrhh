@@ -33,6 +33,9 @@ model Tenant {
   employees          Employee[]
   auditLogs          AuditLog[]
 
+  // Fase 1 — Nómina
+  planillaNovedades PlanillaNovedad[]
+
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
   geofences               Geofence[]
@@ -171,6 +174,7 @@ model Employee {
   cuentasBancarias      CuentaBancaria[]
   regimenesPensionarios RegimenPensionario[]
   planillaDetalles      PlanillaDetalle[]
+  planillaNovedades     PlanillaNovedad[]
   liquidacion           Liquidacion?
 
   // Fase 2 — Asistencia
@@ -298,6 +302,30 @@ model Provision {
 
   @@index([tenantId, periodo])
   @@map("provision")
+}
+
+/// Novedades del período (importadas por CSV u otra fuente) que el motor de
+/// nómina incorpora al procesar: días laborados (prorrateo), horas extra 25/35%,
+/// bonificaciones y descuentos adicionales. Una fila por trabajador y período.
+model PlanillaNovedad {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  employeeId     String   @map("employee_id") @db.Uuid
+  periodo        String   @db.VarChar(7) // YYYY-MM
+  diasLaborados  Int?     @map("dias_laborados")
+  horasExtra25   Decimal  @default(0) @map("horas_extra_25") @db.Decimal(6, 2)
+  horasExtra35   Decimal  @default(0) @map("horas_extra_35") @db.Decimal(6, 2)
+  bonificaciones Decimal  @default(0) @db.Decimal(10, 2)
+  descuentos     Decimal  @default(0) @db.Decimal(10, 2)
+  fuente         String   @default("csv") @db.VarChar(20)
+  creadoEn       DateTime @default(now()) @map("creado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId, periodo])
+  @@index([tenantId, periodo])
+  @@map("planilla_novedad")
 }
 
 model Liquidacion {

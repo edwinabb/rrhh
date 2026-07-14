@@ -7,8 +7,10 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import {
@@ -16,6 +18,7 @@ import {
   TenantContext,
 } from '../../common/database/tenant-request-context';
 import { AttendanceService } from './attendance.service';
+import { AttendanceImportService } from './attendance-import.service';
 import { BiometricIntegrationService } from './biometric-integration.service';
 import { PayrollAttendanceExporterService } from './payroll-attendance-exporter.service';
 import type { TipoMarcacion } from './calculators/marcacion.calculator';
@@ -54,6 +57,11 @@ export class ResolverJustificacionDto {
   aprobar!: boolean;
   /** Obligatorio cuando aprobar === false (trazabilidad para el trabajador). */
   motivoRechazo?: string;
+}
+
+export class ImportarCsvDto {
+  /** Contenido completo del archivo CSV (el frontend lo lee con FileReader). */
+  csv!: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -97,9 +105,45 @@ function requireIdentity(ctx: TenantContext): { tenantId: string; userId: string
 export class AttendanceController {
   constructor(
     private readonly attendanceService: AttendanceService,
+    private readonly attendanceImportService: AttendanceImportService,
     private readonly biometricService: BiometricIntegrationService,
     private readonly payrollExporter: PayrollAttendanceExporterService,
   ) {}
+
+  /**
+   * GET /attendance/import/plantilla — descarga la plantilla CSV de ejemplo
+   * para el import de marcaciones (con BOM UTF-8 para Excel).
+   */
+  @Get('import/plantilla')
+  @RequirePermission('attendance.import')
+  descargarPlantillaImport(@Res() res: Response) {
+    const plantilla = this.attendanceImportService.generarPlantilla();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="plantilla-asistencia.csv"',
+    );
+    res.send(plantilla);
+  }
+
+  /**
+   * POST /attendance/import — importa marcaciones desde un CSV exportado por
+   * un sistema biométrico externo. El frontend lee el archivo con FileReader
+   * y envía el contenido como { csv: string }. Validación por fila: los
+   * errores se acumulan y se retorna { procesadas, omitidas, errores }.
+   */
+  @Post('import')
+  @RequirePermission('attendance.import')
+  async importarCsv(@Body() dto: ImportarCsvDto) {
+    const ctx = getTenantContext();
+    const { userId } = requireIdentity(ctx);
+
+    if (!dto.csv || typeof dto.csv !== 'string') {
+      throw new BadRequestException('csv (string con el contenido del archivo) es obligatorio');
+    }
+
+    return this.attendanceImportService.importarCsv(ctx.tx, dto.csv, userId);
+  }
 
   /**
    * POST /attendance/marcaciones — registra una marcación ENTRADA/SALIDA.

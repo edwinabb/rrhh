@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
+import { AttendanceImportService } from './attendance-import.service';
 import {
   BIOMETRIC_PROVIDER,
   BiometricIntegrationService,
@@ -12,6 +13,7 @@ import { PayrollAttendanceExporterService } from './payroll-attendance-exporter.
   controllers: [AttendanceController],
   providers: [
     AttendanceService,
+    AttendanceImportService,
     BiometricIntegrationService,
     PayrollAttendanceExporterService,
     // Proveedor biométrico del MVP; en producción se registra la

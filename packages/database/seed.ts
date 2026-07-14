@@ -38,12 +38,14 @@ const PERMISSIONS = [
   // Fase 1 — Nómina
   { code: 'payroll.process', descripcion: 'Procesar el ciclo de planilla', esSensible: true },
   { code: 'payroll.export', descripcion: 'Exportar planilla (PLAME, telecrédito)', esSensible: true },
+  { code: 'payroll.import', descripcion: 'Importar novedades de planilla por CSV', esSensible: true },
   // Fase 2 — Asistencia
   { code: 'attendance.mark', descripcion: 'Registrar marcación propia', esSensible: false },
   { code: 'attendance.justify', descripcion: 'Solicitar justificación de falta/tardanza', esSensible: false },
   { code: 'attendance.approve', descripcion: 'Aprobar o rechazar justificaciones', esSensible: false },
   { code: 'attendance.read', descripcion: 'Ver asistencia propia', esSensible: false },
   { code: 'attendance.read.team', descripcion: 'Ver asistencia del equipo (dashboard)', esSensible: false },
+  { code: 'attendance.import', descripcion: 'Importar marcaciones desde sistema externo', esSensible: false },
   // Fase 3 — Documental
   { code: 'documents.upload', descripcion: 'Subir documentos al legajo', esSensible: false },
   { code: 'documents.read', descripcion: 'Ver y descargar documentos del legajo', esSensible: false },
@@ -72,11 +74,13 @@ const SYSTEM_ROLES: Record<string, { descripcion: string; permissions: string[] 
       'normative_param.read',
       'payroll.process',
       'payroll.export',
+      'payroll.import',
       'attendance.mark',
       'attendance.justify',
       'attendance.approve',
       'attendance.read',
       'attendance.read.team',
+      'attendance.import',
       'documents.upload',
       'documents.read',
       'ats.read',

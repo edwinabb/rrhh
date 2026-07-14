@@ -18,6 +18,20 @@ export interface ConceptoCalculado {
   monto: number;
 }
 
+/** Decimal de Prisma o número plano (mocks) → number. */
+function aNumero(valor: unknown, porDefecto = 0): number {
+  if (valor == null) return porDefecto;
+  if (typeof valor === 'object' && typeof (valor as any).toNumber === 'function') {
+    return (valor as any).toNumber();
+  }
+  return Number(valor);
+}
+
+/** Redondeo a 2 decimales para montos monetarios. */
+function redondear(monto: number): number {
+  return Math.round(monto * 100) / 100;
+}
+
 /**
  * Orquesta un ciclo de planilla: para cada trabajador activo del tenant,
  * resuelve los parámetros normativos vigentes a la fecha del periodo y ejecuta
@@ -43,6 +57,15 @@ export class PayrollRunService {
         cuentasBancarias: true,
       },
     });
+
+    // Novedades del período (importadas por CSV — ver PayrollImportService).
+    // El optional chaining mantiene compatibilidad con clientes/mocks que no
+    // exponen el modelo: sin novedades, el cálculo es idéntico al flujo base.
+    const novedades =
+      (await client.planillaNovedad?.findMany({ where: { periodo } })) ?? [];
+    const novedadPorEmpleado = new Map<string, any>(
+      novedades.map((n: any) => [n.employeeId, n]),
+    );
 
     // Resolver parámetros normativos vigentes
     const uit = (await this.normativeParams.resolve(client, 'UIT', fechaPeriodo)) as number;
@@ -70,12 +93,71 @@ export class PayrollRunService {
       const contrato = empleado.contratos[0];
       const regimenPensionario = empleado.regimenesPensionarios[0];
       const remuneracion = contrato.remuneracionBasica.toNumber();
+      const novedad = novedadPorEmpleado.get(empleado.id);
 
       const conceptosCalculados: ConceptoCalculado[] = [];
       let totalDescuentos = 0;
 
-      // 1. Remuneración Base
-      conceptosCalculados.push({ codigo: '0121', nombre: 'Sueldo', monto: remuneracion });
+      // 1. Remuneración Base — prorrateada si la novedad trae diasLaborados < 30
+      const diasLaborados =
+        novedad?.diasLaborados != null ? aNumero(novedad.diasLaborados) : null;
+      const sueldoBase =
+        diasLaborados != null && diasLaborados < 30
+          ? redondear((remuneracion * diasLaborados) / 30)
+          : remuneracion;
+      conceptosCalculados.push({ codigo: '0121', nombre: 'Sueldo', monto: sueldoBase });
+
+      // 1b. Novedades del período (horas extra, bonificaciones, descuentos)
+      let ingresosNovedad = 0;
+      let descuentosNovedad = 0;
+      if (novedad) {
+        // Valor hora: remuneración / 30 días / jornada diaria del contrato
+        // (8h legales D.Leg. 854 si el Json de jornada no la especifica).
+        const horasDia = aNumero((contrato.jornada as any)?.horasDia, 8) || 8;
+        const valorHora = remuneracion / 30 / horasDia;
+
+        const horas25 = aNumero(novedad.horasExtra25);
+        if (horas25 > 0) {
+          const monto25 = redondear(horas25 * valorHora * 1.25);
+          conceptosCalculados.push({
+            codigo: '0104',
+            nombre: 'Horas Extra 25%',
+            monto: monto25,
+          });
+          ingresosNovedad += monto25;
+        }
+
+        const horas35 = aNumero(novedad.horasExtra35);
+        if (horas35 > 0) {
+          const monto35 = redondear(horas35 * valorHora * 1.35);
+          conceptosCalculados.push({
+            codigo: '0105',
+            nombre: 'Horas Extra 35%',
+            monto: monto35,
+          });
+          ingresosNovedad += monto35;
+        }
+
+        const bonificaciones = aNumero(novedad.bonificaciones);
+        if (bonificaciones > 0) {
+          conceptosCalculados.push({
+            codigo: '0312',
+            nombre: 'Bonificaciones (novedades)',
+            monto: redondear(bonificaciones),
+          });
+          ingresosNovedad += redondear(bonificaciones);
+        }
+
+        const descuentos = aNumero(novedad.descuentos);
+        if (descuentos > 0) {
+          conceptosCalculados.push({
+            codigo: '0704',
+            nombre: 'Otros descuentos (novedades)',
+            monto: -redondear(descuentos),
+          });
+          descuentosNovedad += redondear(descuentos);
+        }
+      }
 
       // 2. Asignación Familiar
       const asignacionFamiliar = calcularAsignacionFamiliar({
@@ -145,8 +227,14 @@ export class PayrollRunService {
         totalDescuentos += quinta.retencionMensual;
       }
 
-      // Neto a pagar
-      const netoPagar = remuneracion + asignacionFamiliar.monto - totalDescuentos;
+      // Neto a pagar (sueldo base prorrateado + ingresos por novedades
+      // - descuentos de ley - descuentos por novedades)
+      const netoPagar =
+        sueldoBase +
+        asignacionFamiliar.monto +
+        ingresosNovedad -
+        totalDescuentos -
+        descuentosNovedad;
 
       // Guardar en PLANILLA_DETALLE
       await client.planillaDetalle.create({
