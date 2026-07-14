@@ -1,0 +1,2913 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FASE 3 Documental MVP - Especificación HRMS Perú</title>
+  <style>
+    /* Token System */
+    :root {
+      --color-primary: #0F4C75;
+      --color-accent: #3A86FF;
+      --color-critical: #FB5607;
+      --color-success: #06A77D;
+      --color-text: #1A1A1A;
+      --color-text-secondary: #666666;
+      --color-bg: #FFFFFF;
+      --color-surface: #F5F5F5;
+      --color-border: #E8E8E8;
+
+      --font-display: "Georgia", "Garamond", serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "Menlo", "Monaco", "Courier New", monospace;
+
+      --spacing-xs: 0.5rem;
+      --spacing-sm: 1rem;
+      --spacing-md: 1.5rem;
+      --spacing-lg: 2rem;
+      --spacing-xl: 3rem;
+
+      --line-height-tight: 1.4;
+      --line-height-normal: 1.6;
+      --line-height-relaxed: 1.8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-text: #F0F0F0;
+        --color-text-secondary: #B0B0B0;
+        --color-bg: #1A1A1A;
+        --color-surface: #2A2A2A;
+        --color-border: #404040;
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --color-text: #F0F0F0;
+      --color-text-secondary: #B0B0B0;
+      --color-bg: #1A1A1A;
+      --color-surface: #2A2A2A;
+      --color-border: #404040;
+    }
+
+    :root[data-theme="light"] {
+      --color-text: #1A1A1A;
+      --color-text-secondary: #666666;
+      --color-bg: #FFFFFF;
+      --color-surface: #F5F5F5;
+      --color-border: #E8E8E8;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: var(--line-height-normal);
+      color: var(--color-text);
+      background: var(--color-bg);
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--spacing-lg);
+    }
+
+    /* Typography System */
+    h1 {
+      font-family: var(--font-display);
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: var(--line-height-tight);
+      margin-bottom: var(--spacing-md);
+      color: var(--color-primary);
+      text-wrap: balance;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: var(--line-height-tight);
+      margin-top: var(--spacing-xl);
+      margin-bottom: var(--spacing-md);
+      color: var(--color-primary);
+      border-bottom: 3px solid var(--color-accent);
+      padding-bottom: var(--spacing-sm);
+      text-wrap: balance;
+    }
+
+    h3 {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      line-height: var(--line-height-tight);
+      margin-top: var(--spacing-lg);
+      margin-bottom: var(--spacing-md);
+      color: var(--color-primary);
+      text-wrap: balance;
+    }
+
+    h4 {
+      font-family: var(--font-body);
+      font-size: 1.125rem;
+      font-weight: 600;
+      line-height: var(--line-height-tight);
+      margin-top: var(--spacing-md);
+      margin-bottom: var(--spacing-sm);
+      color: var(--color-primary);
+      text-wrap: balance;
+    }
+
+    p {
+      margin-bottom: var(--spacing-md);
+      line-height: var(--line-height-relaxed);
+      max-width: 70ch;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--color-text-secondary);
+      line-height: var(--line-height-relaxed);
+      margin-bottom: var(--spacing-lg);
+      max-width: 70ch;
+    }
+
+    .header-section {
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .metadata {
+      display: flex;
+      gap: var(--spacing-lg);
+      margin: var(--spacing-lg) 0;
+      font-size: 0.95rem;
+      color: var(--color-text-secondary);
+      flex-wrap: wrap;
+    }
+
+    .metadata-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    .metadata-label {
+      font-weight: 600;
+      color: var(--color-primary);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Sections */
+    section {
+      margin-bottom: var(--spacing-xl);
+    }
+
+    section + section {
+      padding-top: var(--spacing-xl);
+      border-top: 1px solid var(--color-border);
+    }
+
+    /* Lists */
+    ul, ol {
+      margin: var(--spacing-md) 0 var(--spacing-md) var(--spacing-lg);
+      line-height: var(--line-height-relaxed);
+    }
+
+    li {
+      margin-bottom: var(--spacing-sm);
+    }
+
+    li > strong {
+      color: var(--color-primary);
+    }
+
+    /* Code & Pre */
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background: var(--color-surface);
+      padding: 0.2em 0.4em;
+      border-radius: 0.25rem;
+      color: var(--color-accent);
+    }
+
+    pre {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid var(--color-accent);
+      padding: var(--spacing-md);
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      margin: var(--spacing-md) 0;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+
+    pre code {
+      background: transparent;
+      color: var(--color-text-secondary);
+      padding: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: var(--spacing-md) 0;
+      font-size: 0.95rem;
+    }
+
+    table-wrapper {
+      overflow-x: auto;
+      margin: var(--spacing-md) 0;
+    }
+
+    thead {
+      background: var(--color-surface);
+      border-bottom: 2px solid var(--color-primary);
+    }
+
+    th {
+      padding: var(--spacing-sm);
+      text-align: left;
+      font-weight: 600;
+      color: var(--color-primary);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      padding: var(--spacing-sm);
+      border-bottom: 1px solid var(--color-border);
+      font-variant-numeric: tabular-nums;
+    }
+
+    tbody tr:hover {
+      background: var(--color-surface);
+    }
+
+    /* Cards / Boxes */
+    .card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-left: 4px solid var(--color-accent);
+      padding: var(--spacing-md);
+      border-radius: 0.5rem;
+      margin: var(--spacing-md) 0;
+    }
+
+    .card.critical {
+      border-left-color: var(--color-critical);
+    }
+
+    .card.success {
+      border-left-color: var(--color-success);
+    }
+
+    .card-title {
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-bottom: var(--spacing-sm);
+      font-size: 1rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.9rem;
+      color: var(--color-text-secondary);
+    }
+
+    /* Callouts */
+    .callout {
+      background: var(--color-surface);
+      border-left: 4px solid var(--color-accent);
+      padding: var(--spacing-md);
+      margin: var(--spacing-md) 0;
+      border-radius: 0.25rem;
+    }
+
+    .callout.warning {
+      border-left-color: var(--color-critical);
+      background: var(--color-surface);
+    }
+
+    .callout strong {
+      color: var(--color-primary);
+    }
+
+    /* Tags */
+    .tag {
+      display: inline-block;
+      background: var(--color-accent);
+      color: white;
+      padding: 0.25em 0.6em;
+      border-radius: 0.25rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-right: var(--spacing-xs);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .tag.required {
+      background: var(--color-critical);
+    }
+
+    .tag.optional {
+      background: var(--color-text-secondary);
+    }
+
+    /* Feature Grid */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: var(--spacing-md);
+      margin: var(--spacing-md) 0;
+    }
+
+    .feature-item {
+      background: var(--color-surface);
+      padding: var(--spacing-md);
+      border-radius: 0.5rem;
+      border: 1px solid var(--color-border);
+    }
+
+    .feature-item-title {
+      font-weight: 600;
+      color: var(--color-primary);
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .feature-item-desc {
+      font-size: 0.95rem;
+      color: var(--color-text-secondary);
+      line-height: var(--line-height-relaxed);
+    }
+
+    /* Links */
+    a {
+      color: var(--color-accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    a:hover {
+      color: var(--color-primary);
+      text-decoration: underline;
+    }
+
+    /* Keyboard focus */
+    a:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 0.25rem;
+      border-radius: 0.125rem;
+    }
+
+    /* Print */
+    @media print {
+      body {
+        background: white;
+        color: black;
+      }
+      .container {
+        max-width: 100%;
+        padding: 0;
+      }
+      a {
+        color: #0F4C75;
+      }
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header-section">
+      <h1>Fase 3: Documental MVP</h1>
+      <p class="subtitle">Módulo de Gestión de Legajos Digitales con Cumplimiento Ley 29733 (PDPA)</p>
+
+      <div class="metadata">
+        <div class="metadata-item">
+          <span class="metadata-label">Proyecto</span>
+          <span>HRMS Perú - Multi-tenant SaaS</span>
+        </div>
+        <div class="metadata-item">
+          <span class="metadata-label">Stack</span>
+          <span>NestJS + TypeScript, Prisma ORM, PostgreSQL 16, MinIO, Jest</span>
+        </div>
+        <div class="metadata-item">
+          <span class="metadata-label">Alcance MVP</span>
+          <span>8 componentes core, 35+ endpoints REST</span>
+        </div>
+        <div class="metadata-item">
+          <span class="metadata-label">Normativa</span>
+          <span>Ley 29733 PDPA, Resolución 087-2011-JUS</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Section 1: Descripción General -->
+    <section id="overview">
+      <h2>1. Descripción General</h2>
+
+      <h3>Objetivo MVP</h3>
+      <p>Implementar un módulo completo de gestión de legajos digitales por empleado que cumple con la normativa peruana de protección de datos personales (Ley 29733 PDPA). El sistema permite centralizar documentación laboral, mantener histórico de cambios, asegurar trazabilidad mediante audit logs, y controlar acceso mediante RBAC.</p>
+
+      <h3>Funcionalidades Priorizadas</h3>
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-item-title">Legajo Digital Organizado</div>
+          <div class="feature-item-desc">Carpeta virtual por empleado con estructura jerárquica de tipos de documentos (Contrato, CV, ID, Certificados, etc.)</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Versionamiento Automático</div>
+          <div class="feature-item-desc">Historial completo de cambios: quién subió, cuándo, qué versión anterior. Auditable 100%.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Búsqueda Avanzada</div>
+          <div class="feature-item-desc">Filtrar por empleado, tipo de documento, rango de fechas, uploader. Indexación en Prisma.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Descarga ZIP del Legajo</div>
+          <div class="feature-item-desc">Generación de archivo ZIP con estructura del legajo completo (solo documentos con acceso permitido).</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Almacenamiento Escalable</div>
+          <div class="feature-item-desc">MinIO S3-compatible. Metadatos en PostgreSQL, blobs en object storage. Separación clara.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">RBAC Granular</div>
+          <div class="feature-item-desc">Admin (full), RRHH (read+upload), Manager (read own reports). Integrado con RLS.</div>
+        </div>
+      </div>
+
+      <div class="callout warning">
+        <strong>Cumplimiento PDPA Perú:</strong> Todos los documentos son datos personales. El sistema registra consentimiento, encriptación en tránsito (TLS), auditoría de acceso (audit log), y facilita cumplimiento de derecho al olvido mediante soft-delete + hard-delete asincrónica.
+      </div>
+
+      <h3>No Incluir en Fase 3</h3>
+      <ul>
+        <li>Firmas digitales avanzadas (RSA, certificados PKI)</li>
+        <li>Workflow de aprobación multi-step</li>
+        <li>ESS Sunat (Expediente Simplificado Sunat) - Fase 4</li>
+        <li>OCR y extracción de datos</li>
+        <li>Integración con suscriptor de TER (Terceros)</li>
+      </ul>
+    </section>
+
+    <!-- Section 2: Modelos Prisma -->
+    <section id="models">
+      <h2>2. Modelos de Datos (Prisma ORM)</h2>
+
+      <h3>2.1 Esquema Core</h3>
+      <p>Extensión de esquema existente. Suponemos tablas base: <code>User</code>, <code>Organization</code>, <code>Employee</code>, <code>AuditLog</code>.</p>
+
+      <pre><code>// prisma/schema.prisma
+
+// ============= ENUMS =============
+enum DocumentType {
+  CONTRATO            // Contratos laborales
+  CV                  // Curriculum vitae
+  CEDULA_IDENTIDAD    // DNI/Cédula
+  LICENCIA_CONDUCIR   // Licencia de conducir
+  PASAPORTE           // Pasaporte
+  CERTIFICADO_ESTUDIO // Certificados educativos
+  CERTIFICADO_LABORAL // Certificados de experiencia
+  CERTIFICADO_MEDICO  // Exámenes médicos ocupacionales
+  CONTRATO_BENEFICIOS // Acuerdos de beneficios
+  DOCUMENTO_FISCAL    // Documentos fiscales (SUNAT)
+  OTRO                // Otros documentos
+}
+
+enum DocumentStatus {
+  ACTIVE      // Documento vigente
+  INACTIVE    // Documento reemplazado/archivado
+  DELETED     // Marcado para eliminación (soft-delete)
+}
+
+enum AccessLevel {
+  ADMIN       // Administrador de organización
+  RRHH        // Departamento RRHH
+  MANAGER     // Gerente (solo sus reportes)
+  EMPLOYEE    // Empleado (solo su propio legajo)
+  VIEWER      // Lectura sin modificación
+}
+
+// ============= MODELS =============
+
+model Document {
+  id                String          @id @default(cuid())
+  tenantId          String          // Multi-tenant RLS
+  employeeId        String
+  employee          Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  type              DocumentType    @default(OTRO)
+  title             String          // Ej: "Contrato 2024-01"
+  description       String?
+
+  // Metadatos de almacenamiento
+  minionPath        String          // Ruta en MinIO: /tenants/{tenantId}/employees/{employeeId}/documents/{documentId}/{version}/file.pdf
+  minioKey          String          @unique // Clave única para recuperación en MinIO
+  fileSize          BigInt
+  mimeType          String          // application/pdf, image/jpeg, etc.
+
+  // Versionamiento
+  currentVersionId  String
+  currentVersion    DocumentVersion @relation("currentVersion", fields: [currentVersionId], references: [id])
+  versions          DocumentVersion[] @relation("documentVersions")
+
+  // Metadatos y control
+  status            DocumentStatus  @default(ACTIVE)
+  uploadedAt        DateTime        @default(now())
+  uploadedBy        String          // User ID who uploaded
+  modifiedAt        DateTime        @updatedAt
+  modifiedBy        String?         // Last modifier User ID
+
+  // Cumplimiento PDPA
+  requiresConsent   Boolean         @default(true) // ¿Requiere consentimiento?
+  consentDate       DateTime?       // Cuándo se obtuvo consentimiento
+  consentSource     String?         // De dónde se obtuvo (ej: "signed_by_employee")
+
+  // Soft-delete PDPA compliance
+  deletedAt         DateTime?
+  deletionReason    String?         // Ej: "Employee request", "Policy retention"
+
+  // Indices
+  @@index([tenantId])
+  @@index([employeeId])
+  @@index([type])
+  @@index([status])
+  @@index([uploadedAt])
+  @@index([deletedAt])
+  @@unique([tenantId, employeeId, minioKey]) // Evita duplicados
+}
+
+model DocumentVersion {
+  id                String        @id @default(cuid())
+  documentId        String
+  document          Document      @relation("documentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+
+  versionNumber     Int           // 1, 2, 3...
+  minionPath        String        // /tenants/{tenantId}/employees/{employeeId}/documents/{documentId}/v{versionNumber}/file.pdf
+  minioKey          String        @unique
+  fileSize          BigInt
+  mimeType          String
+
+  // Auditoría
+  uploadedBy        String        // User ID
+  uploadedAt        DateTime      @default(now())
+  uploadReason      String?       // "Updated salary info", "Annual review", etc.
+
+  // Marcar si es "current"
+  isCurrentVersion  Boolean       @default(true)
+
+  // Metadatos del archivo
+  checksum          String?       // SHA256 para integridad
+
+  // Relación inversa
+  document_current  Document?     @relation("currentVersion")
+
+  @@index([documentId])
+  @@index([versionNumber])
+  @@index([uploadedAt])
+  @@unique([documentId, versionNumber])
+}
+
+model DocumentMetadata {
+  id                String        @id @default(cuid())
+  documentId        String        @unique
+  document          Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  // Metadatos extraídos/manuales
+  expirationDate    DateTime?     // Para documentos con vigencia (ej: licencia)
+  issuedDate        DateTime?     // Fecha de emisión
+  issuer            String?       // Quién emitió (organización)
+
+  // Tags adicionales
+  tags              String[]      // ["confidencial", "financiero", "médico"]
+
+  // Clasificación de sensibilidad (para búsqueda/control)
+  sensitivityLevel  String        @default("normal") // normal, confidencial, crítico
+
+  // Notas internas (RRHH/Admin solo)
+  internalNotes     String?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+// ============= AUDIT & COMPLIANCE =============
+
+model DocumentAuditLog {
+  id                String        @id @default(cuid())
+  tenantId          String
+  documentId        String
+  document          Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  action            String        // "UPLOAD", "VIEW", "DELETE", "VERSION_CREATE", "DOWNLOAD"
+  performedBy       String        // User ID
+  performedAt       DateTime      @default(now())
+
+  // Contexto
+  ipAddress         String?
+  userAgent         String?       // Para rastrear acceso
+
+  // Detalles del cambio
+  changeDetails     Json?         // {before: {...}, after: {...}} para cambios
+  reason            String?       // Motivo del cambio (si aplica)
+
+  // Cumplimiento
+  consentVerified   Boolean       @default(false)
+
+  @@index([tenantId])
+  @@index([documentId])
+  @@index([performedBy])
+  @@index([performedAt])
+  @@index([action])
+}
+
+// ============= ACCESS CONTROL =============
+
+model DocumentRolePermission {
+  id                String        @id @default(cuid())
+  tenantId          String
+  role              AccessLevel
+
+  canUpload         Boolean       @default(false)
+  canDownload       Boolean       @default(true)
+  canDelete         Boolean       @default(false)
+  canViewAll        Boolean       @default(false) // Ver legajos de otros
+  canViewOwn        Boolean       @default(true)  // Ver propio legajo
+  canExport         Boolean       @default(false)
+  canViewAuditLog   Boolean       @default(false)
+  canManageRetention Boolean      @default(false)
+
+  @@unique([tenantId, role])
+  @@index([tenantId])
+}
+
+// Relación employee <-> role (para multi-role support)
+model EmployeeRoleAssignment {
+  id                String        @id @default(cuid())
+  tenantId          String
+  employeeId        String
+  employee          Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  role              AccessLevel
+  assignedAt        DateTime      @default(now())
+  assignedBy        String        // User ID
+
+  @@unique([tenantId, employeeId, role])
+  @@index([tenantId])
+  @@index([employeeId])
+}</code></pre>
+
+      <h3>2.2 RLS (Row Level Security) Strategy</h3>
+      <p>Implementar en PostgreSQL mediante políticas:</p>
+
+      <pre><code>-- PostgreSQL RLS Policies
+
+-- Policy: Multi-tenant isolation
+CREATE POLICY tenant_isolation ON "Document"
+  AS RESTRICTIVE
+  USING (
+    "tenantId" = current_setting('app.current_tenant_id')
+  );
+
+-- Policy: RBAC-based access
+CREATE POLICY access_by_role ON "Document"
+  AS PERMISSIVE
+  USING (
+    -- Admin: acceso total
+    current_setting('app.user_role') = 'ADMIN'
+    OR
+    -- RRHH: ver todos, pero no empleados de otros tenants
+    (current_setting('app.user_role') = 'RRHH' AND "tenantId" = current_setting('app.current_tenant_id'))
+    OR
+    -- Manager: solo sus reportes (implementar en app layer con join a organizational hierarchy)
+    (current_setting('app.user_role') = 'MANAGER' AND "employeeId" IN (
+      SELECT id FROM "Employee" WHERE "managerId" = current_setting('app.user_id')
+    ))
+    OR
+    -- Employee: solo su propio legajo
+    (current_setting('app.user_role') = 'EMPLOYEE' AND "employeeId" = current_setting('app.user_id'))
+  );
+
+-- Enable RLS
+ALTER TABLE "Document" ENABLE ROW LEVEL SECURITY;</code></pre>
+
+      <div class="card">
+        <div class="card-title">Nota sobre RLS en Prisma</div>
+        <p>Prisma no controla directamente RLS. Usaremos:<br>
+        1. RLS a nivel PostgreSQL (políticas SQL)<br>
+        2. Context de tenant en cada query: <code>@db.Raw()</code> con <code>SET app.current_tenant_id</code><br>
+        3. Validación en app layer (NestJS) antes de queries</p>
+      </div>
+    </section>
+
+    <!-- Section 3: Servicios -->
+    <section id="services">
+      <h2>3. Servicios Core</h2>
+
+      <h3>3.1 MinIOIntegration Service</h3>
+      <p>Gestionar conexión con MinIO y operaciones S3-compatible.</p>
+
+      <pre><code>// src/modules/documents/services/minio.integration.ts
+
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import * as Minio from 'minio';
+import { ConfigService } from '@nestjs/config';
+
+@Injectable()
+export class MinIOIntegrationService {
+  private minioClient: Minio.Client;
+  private logger = new Logger(MinIOIntegrationService.name);
+
+  constructor(private configService: ConfigService) {
+    this.minioClient = new Minio.Client({
+      endPoint: this.configService.get('MINIO_ENDPOINT'),
+      port: this.configService.get('MINIO_PORT'),
+      useSSL: this.configService.get('MINIO_USE_SSL') === 'true',
+      accessKey: this.configService.get('MINIO_ACCESS_KEY'),
+      secretKey: this.configService.get('MINIO_SECRET_KEY'),
+      region: this.configService.get('MINIO_REGION', 'us-east-1'),
+    });
+
+    this.initializeBuckets();
+  }
+
+  /**
+   * Inicializar buckets tenants si no existen
+   */
+  private async initializeBuckets(): Promise<void> {
+    const bucketName = this.configService.get('MINIO_BUCKET');
+    try {
+      const exists = await this.minioClient.bucketExists(bucketName);
+      if (!exists) {
+        await this.minioClient.makeBucket(bucketName, 'us-east-1');
+        this.logger.log(`Bucket ${bucketName} created`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to initialize bucket: ${error.message}`);
+    }
+  }
+
+  /**
+   * Subir archivo a MinIO
+   * @param fileBuffer Buffer del archivo
+   * @param minioKey Ruta en MinIO
+   * @param mimeType Content-Type
+   * @returns URL de acceso y metadatos
+   */
+  async uploadFile(
+    fileBuffer: Buffer,
+    minioKey: string,
+    mimeType: string,
+  ): Promise<{ url: string; size: number; etag: string }> {
+    try {
+      const bucketName = this.configService.get('MINIO_BUCKET');
+
+      // Validaciones
+      if (fileBuffer.length > 100 * 1024 * 1024) { // 100MB max
+        throw new BadRequestException('File size exceeds 100MB limit');
+      }
+
+      const etag = await this.minioClient.putObject(
+        bucketName,
+        minioKey,
+        fileBuffer,
+        fileBuffer.length,
+        {
+          'Content-Type': mimeType,
+          // Encriptación en tránsito, metadatos
+          'x-amz-meta-uploaded-at': new Date().toISOString(),
+        },
+      );
+
+      const url = await this.minioClient.presignedGetObject(
+        bucketName,
+        minioKey,
+        7 * 24 * 60 * 60, // 7 días de expiración
+      );
+
+      return {
+        url,
+        size: fileBuffer.length,
+        etag,
+      };
+    } catch (error) {
+      this.logger.error(`Upload failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Descargar archivo desde MinIO
+   */
+  async downloadFile(minioKey: string): Promise<Buffer> {
+    try {
+      const bucketName = this.configService.get('MINIO_BUCKET');
+      const chunks: Buffer[] = [];
+
+      const dataStream = await this.minioClient.getObject(bucketName, minioKey);
+
+      return new Promise((resolve, reject) => {
+        dataStream.on('data', (chunk) => chunks.push(chunk));
+        dataStream.on('end', () => resolve(Buffer.concat(chunks)));
+        dataStream.on('error', reject);
+      });
+    } catch (error) {
+      this.logger.error(`Download failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Eliminar archivo (hard delete)
+   */
+  async deleteFile(minioKey: string): Promise<void> {
+    try {
+      const bucketName = this.configService.get('MINIO_BUCKET');
+      await this.minioClient.removeObject(bucketName, minioKey);
+    } catch (error) {
+      this.logger.error(`Delete failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Generar URL de descarga con expiración
+   */
+  async getPresignedUrl(minioKey: string, expirySeconds = 3600): Promise<string> {
+    try {
+      const bucketName = this.configService.get('MINIO_BUCKET');
+      return await this.minioClient.presignedGetObject(bucketName, minioKey, expirySeconds);
+    } catch (error) {
+      this.logger.error(`Presigned URL generation failed: ${error.message}`);
+      throw error;
+    }
+  }
+}</code></pre>
+
+      <h3>3.2 DocumentService</h3>
+      <p>Lógica core de gestión de documentos: upload, download, versionamiento, búsqueda.</p>
+
+      <pre><code>// src/modules/documents/services/document.service.ts
+
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+import { MinIOIntegrationService } from './minio.integration';
+import { DocumentAuditService } from './document-audit.service';
+import { Document, DocumentVersion, DocumentStatus, DocumentType } from '@prisma/client';
+import * as crypto from 'crypto';
+import * as JSZip from 'jszip';
+
+interface UploadDocumentDto {
+  file: Express.Multer.File;
+  tenantId: string;
+  employeeId: string;
+  documentType: DocumentType;
+  title: string;
+  description?: string;
+  uploadedBy: string;
+  uploadReason?: string;
+  requiresConsent?: boolean;
+  consentDate?: Date;
+}
+
+interface DownloadLegajoDto {
+  tenantId: string;
+  employeeId: string;
+  requestedBy: string;
+}
+
+@Injectable()
+export class DocumentService {
+  constructor(
+    private prisma: PrismaService,
+    private minioService: MinIOIntegrationService,
+    private auditService: DocumentAuditService,
+  ) {}
+
+  /**
+   * Subir documento (crea o nueva versión)
+   */
+  async uploadDocument(dto: UploadDocumentDto): Promise<Document> {
+    const { file, tenantId, employeeId, documentType, title, uploadedBy } = dto;
+
+    // Validar tenant context
+    await this.validateTenantContext(tenantId);
+
+    // Validar empleado existe en tenant
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    if (!employee || employee.tenantId !== tenantId) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    // Generar ruta MinIO
+    const documentId = crypto.randomUUID();
+    const versionNumber = 1;
+    const minioPath = this.generateMinIOPath(tenantId, employeeId, documentId, versionNumber);
+    const minioKey = `${minioPath}/${file.originalname}`;
+
+    // Subir a MinIO
+    const { size, etag } = await this.minioService.uploadFile(
+      file.buffer,
+      minioKey,
+      file.mimetype,
+    );
+
+    // Calcular checksum
+    const checksum = crypto.createHash('sha256').update(file.buffer).digest('hex');
+
+    // Crear documento en BD
+    const document = await this.prisma.document.create({
+      data: {
+        id: documentId,
+        tenantId,
+        employeeId,
+        type: documentType,
+        title,
+        description: dto.description,
+        minioPath,
+        minioKey,
+        fileSize: BigInt(size),
+        mimeType: file.mimetype,
+        uploadedBy,
+        requiresConsent: dto.requiresConsent ?? true,
+        consentDate: dto.consentDate,
+        consentSource: 'system_upload',
+        currentVersionId: undefined, // Se actualiza después
+      },
+    });
+
+    // Crear versión
+    const version = await this.prisma.documentVersion.create({
+      data: {
+        documentId: document.id,
+        versionNumber,
+        minioPath,
+        minioKey,
+        fileSize: BigInt(size),
+        mimeType: file.mimetype,
+        uploadedBy,
+        uploadReason: dto.uploadReason,
+        isCurrentVersion: true,
+        checksum,
+      },
+    });
+
+    // Actualizar documento con versión actual
+    const updatedDoc = await this.prisma.document.update({
+      where: { id: document.id },
+      data: { currentVersionId: version.id },
+    });
+
+    // Audit log
+    await this.auditService.logAction({
+      tenantId,
+      documentId: document.id,
+      action: 'UPLOAD',
+      performedBy: uploadedBy,
+      changeDetails: { fileName: file.originalname, size, type: documentType },
+    });
+
+    return updatedDoc;
+  }
+
+  /**
+   * Descargar archivo específico
+   */
+  async downloadDocument(
+    documentId: string,
+    tenantId: string,
+    requestedBy: string,
+  ): Promise<Buffer> {
+    const document = await this.validateDocumentAccess(documentId, tenantId, requestedBy, 'DOWNLOAD');
+
+    const fileBuffer = await this.minioService.downloadFile(document.currentVersion.minioKey);
+
+    // Audit log
+    await this.auditService.logAction({
+      tenantId,
+      documentId,
+      action: 'DOWNLOAD',
+      performedBy: requestedBy,
+    });
+
+    return fileBuffer;
+  }
+
+  /**
+   * Descargar legajo completo como ZIP
+   */
+  async downloadLegajo(dto: DownloadLegajoDto): Promise<Buffer> {
+    const { tenantId, employeeId, requestedBy } = dto;
+
+    // Validar acceso
+    await this.validateEmployeeLegajoAccess(tenantId, employeeId, requestedBy);
+
+    // Obtener todos los documentos activos del legajo
+    const documents = await this.prisma.document.findMany({
+      where: {
+        tenantId,
+        employeeId,
+        status: DocumentStatus.ACTIVE,
+        deletedAt: null,
+      },
+      include: {
+        currentVersion: true,
+      },
+      orderBy: [{ type: 'asc' }, { uploadedAt: 'desc' }],
+    });
+
+    // Crear ZIP
+    const zip = new JSZip();
+    const now = new Date().toISOString().split('T')[0];
+
+    for (const doc of documents) {
+      const fileBuffer = await this.minioService.downloadFile(doc.currentVersion.minioKey);
+      const folderName = this.getDocumentTypeLabel(doc.type);
+      const fileName = `${doc.title}_v${doc.currentVersion.versionNumber}.${this.getFileExtension(doc.mimeType)}`;
+
+      zip.folder(folderName)?.file(fileName, fileBuffer);
+    }
+
+    // Agregar metadata.json con índice del legajo
+    const metadata = {
+      generatedAt: new Date().toISOString(),
+      employeeId,
+      documentCount: documents.length,
+      documents: documents.map((d) => ({
+        id: d.id,
+        title: d.title,
+        type: d.type,
+        uploadedAt: d.uploadedAt,
+        version: d.currentVersion.versionNumber,
+      })),
+    };
+
+    zip.file('LEGAJO_INFO.json', JSON.stringify(metadata, null, 2));
+
+    // Audit log
+    await this.auditService.logAction({
+      tenantId,
+      documentId: 'LEGAJO_EXPORT',
+      action: 'DOWNLOAD',
+      performedBy: requestedBy,
+      changeDetails: { type: 'legajo_zip', documentCount: documents.length },
+    });
+
+    return await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  }
+
+  /**
+   * Eliminar documento (soft-delete con compliance)
+   */
+  async deleteDocument(
+    documentId: string,
+    tenantId: string,
+    deletedBy: string,
+    reason: string,
+  ): Promise<Document> {
+    const document = await this.validateDocumentAccess(documentId, tenantId, deletedBy, 'DELETE');
+
+    const deleted = await this.prisma.document.update({
+      where: { id: documentId },
+      data: {
+        status: DocumentStatus.DELETED,
+        deletedAt: new Date(),
+        deletionReason: reason,
+      },
+    });
+
+    // Audit log - crítico para compliance
+    await this.auditService.logAction({
+      tenantId,
+      documentId,
+      action: 'DELETE',
+      performedBy: deletedBy,
+      changeDetails: { reason, deletionType: 'soft_delete' },
+    });
+
+    return deleted;
+  }
+
+  /**
+   * Búsqueda de documentos con filtros
+   */
+  async searchDocuments(filters: {
+    tenantId: string;
+    employeeId?: string;
+    documentType?: DocumentType;
+    dateFrom?: Date;
+    dateTo?: Date;
+    uploadedBy?: string;
+    status?: DocumentStatus;
+    requestedBy: string;
+  }): Promise<Document[]> {
+    await this.validateTenantContext(filters.tenantId);
+
+    // Construir query con RLS
+    const documents = await this.prisma.document.findMany({
+      where: {
+        tenantId: filters.tenantId,
+        ...(filters.employeeId && { employeeId: filters.employeeId }),
+        ...(filters.documentType && { type: filters.documentType }),
+        ...(filters.uploadedBy && { uploadedBy: filters.uploadedBy }),
+        ...(filters.status && { status: filters.status }),
+        ...(filters.dateFrom || filters.dateTo) && {
+          uploadedAt: {
+            ...(filters.dateFrom && { gte: filters.dateFrom }),
+            ...(filters.dateTo && { lte: filters.dateTo }),
+          },
+        },
+        deletedAt: null, // Excluir soft-deleted
+      },
+      include: {
+        employee: true,
+        currentVersion: true,
+      },
+      orderBy: { uploadedAt: 'desc' },
+    });
+
+    return documents;
+  }
+
+  // ========== PRIVATE HELPERS ==========
+
+  private generateMinIOPath(
+    tenantId: string,
+    employeeId: string,
+    documentId: string,
+    versionNumber: number,
+  ): string {
+    return `/documents/${tenantId}/employees/${employeeId}/${documentId}/v${versionNumber}`;
+  }
+
+  private getDocumentTypeLabel(type: DocumentType): string {
+    const labels: Record<DocumentType, string> = {
+      CONTRATO: '01_Contratos',
+      CV: '02_Curriculum',
+      CEDULA_IDENTIDAD: '03_Identificación',
+      LICENCIA_CONDUCIR: '04_Licencias',
+      PASAPORTE: '05_Pasaportes',
+      CERTIFICADO_ESTUDIO: '06_Certificados_Estudio',
+      CERTIFICADO_LABORAL: '07_Certificados_Laboral',
+      CERTIFICADO_MEDICO: '08_Certificados_Médico',
+      CONTRATO_BENEFICIOS: '09_Beneficios',
+      DOCUMENTO_FISCAL: '10_Fiscal',
+      OTRO: '11_Otros',
+    };
+    return labels[type] || '99_Otros';
+  }
+
+  private getFileExtension(mimeType: string): string {
+    const extensions: Record<string, string> = {
+      'application/pdf': 'pdf',
+      'image/jpeg': 'jpg',
+      'image/png': 'png',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/msword': 'doc',
+    };
+    return extensions[mimeType] || 'bin';
+  }
+
+  private async validateDocumentAccess(
+    documentId: string,
+    tenantId: string,
+    userId: string,
+    action: string,
+  ): Promise<Document & { currentVersion: DocumentVersion }> {
+    // Obtener documento
+    const document = await this.prisma.document.findUnique({
+      where: { id: documentId },
+      include: { currentVersion: true },
+    });
+
+    if (!document || document.tenantId !== tenantId) {
+      throw new NotFoundException('Document not found');
+    }
+
+    // Validar permisos (delegado a RoleBasedAccessControl)
+    // Este es un placeholder; implementar en service de permisos
+
+    return document;
+  }
+
+  private async validateEmployeeLegajoAccess(
+    tenantId: string,
+    employeeId: string,
+    userId: string,
+  ): Promise<void> {
+    // Validar que usuario puede acceder al legajo del empleado
+    // Implementar en RoleBasedAccessControl
+  }
+
+  private async validateTenantContext(tenantId: string): Promise<void> {
+    // Validar que tenant existe y está activo
+    const tenant = await this.prisma.organization.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+  }
+}</code></pre>
+
+      <h3>3.3 DocumentAuditService</h3>
+      <p>Integración con sistema de audit logs existente (cumplimiento PDPA).</p>
+
+      <pre><code>// src/modules/documents/services/document-audit.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+
+interface AuditLogDto {
+  tenantId: string;
+  documentId: string;
+  action: 'UPLOAD' | 'VIEW' | 'DOWNLOAD' | 'DELETE' | 'VERSION_CREATE';
+  performedBy: string;
+  changeDetails?: any;
+  reason?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+@Injectable()
+export class DocumentAuditService {
+  constructor(private prisma: PrismaService) {}
+
+  async logAction(dto: AuditLogDto): Promise<void> {
+    await this.prisma.documentAuditLog.create({
+      data: {
+        tenantId: dto.tenantId,
+        documentId: dto.documentId,
+        action: dto.action,
+        performedBy: dto.performedBy,
+        changeDetails: dto.changeDetails,
+        reason: dto.reason,
+        ipAddress: dto.ipAddress,
+        userAgent: dto.userAgent,
+        consentVerified: true, // Auditar con consentimiento verificado
+      },
+    });
+  }
+
+  async getDocumentAuditTrail(documentId: string): Promise<any[]> {
+    return await this.prisma.documentAuditLog.findMany({
+      where: { documentId },
+      orderBy: { performedAt: 'desc' },
+    });
+  }
+
+  async getEmployeeLegajoAudit(employeeId: string): Promise<any[]> {
+    // Obtener audit de todos los documentos del empleado
+    return await this.prisma.documentAuditLog.findMany({
+      where: {
+        document: { employeeId },
+      },
+      include: {
+        document: true,
+      },
+      orderBy: { performedAt: 'desc' },
+    });
+  }
+}</code></pre>
+
+      <h3>3.4 RoleBasedAccessControlService</h3>
+      <p>Validación de permisos por rol y documento.</p>
+
+      <pre><code>// src/modules/documents/services/rbac.service.ts
+
+import { Injectable, ForbiddenException } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+import { AccessLevel } from '@prisma/client';
+
+interface PermissionCheckDto {
+  tenantId: string;
+  userId: string;
+  role: AccessLevel;
+  resourceType: 'DOCUMENT' | 'LEGAJO';
+  resourceId: string; // documentId o employeeId
+  action: 'UPLOAD' | 'DOWNLOAD' | 'DELETE' | 'VIEW' | 'VIEW_AUDIT';
+}
+
+@Injectable()
+export class RoleBasedAccessControlService {
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * Verificar si usuario tiene permisos para acción
+   */
+  async checkPermission(dto: PermissionCheckDto): Promise<boolean> {
+    const { tenantId, userId, role, resourceType, resourceId, action } = dto;
+
+    // Obtener permisos del rol
+    const rolePermissions = await this.prisma.documentRolePermission.findUnique({
+      where: {
+        tenantId_role: { tenantId, role },
+      },
+    });
+
+    if (!rolePermissions) {
+      throw new ForbiddenException('Role permissions not configured');
+    }
+
+    // Validar acción específica
+    const hasPermission = this.validateAction(rolePermissions, action, resourceType, userId, resourceId);
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        `User role ${role} is not allowed to ${action} ${resourceType}`,
+      );
+    }
+
+    return true;
+  }
+
+  /**
+   * Lógica de validación por acción y rol
+   */
+  private validateAction(
+    permissions: any,
+    action: string,
+    resourceType: string,
+    userId: string,
+    resourceId: string,
+  ): boolean {
+    switch (action) {
+      case 'UPLOAD':
+        return permissions.canUpload;
+
+      case 'DOWNLOAD':
+        return permissions.canDownload;
+
+      case 'DELETE':
+        return permissions.canDelete;
+
+      case 'VIEW':
+        if (permissions.canViewAll) return true;
+        if (permissions.canViewOwn && this.isOwnResource(userId, resourceId)) {
+          return true;
+        }
+        return false;
+
+      case 'VIEW_AUDIT':
+        return permissions.canViewAuditLog;
+
+      default:
+        return false;
+    }
+  }
+
+  private isOwnResource(userId: string, resourceId: string): boolean {
+    // Implementar lógica para verificar si es recurso propio
+    // Ej: si resourceId es un documentId, verificar si pertenece al usuario
+    return userId === resourceId; // Simplificado
+  }
+
+  /**
+   * Inicializar permisos por defecto para tenant
+   */
+  async initializeDefaultPermissions(tenantId: string): Promise<void> {
+    const roles: AccessLevel[] = ['ADMIN', 'RRHH', 'MANAGER', 'EMPLOYEE', 'VIEWER'];
+
+    for (const role of roles) {
+      const permConfig = this.getDefaultPermissionConfig(role);
+
+      await this.prisma.documentRolePermission.upsert({
+        where: { tenantId_role: { tenantId, role } },
+        create: { tenantId, role, ...permConfig },
+        update: permConfig,
+      });
+    }
+  }
+
+  private getDefaultPermissionConfig(role: AccessLevel): any {
+    const configs = {
+      ADMIN: {
+        canUpload: true,
+        canDownload: true,
+        canDelete: true,
+        canViewAll: true,
+        canViewOwn: true,
+        canExport: true,
+        canViewAuditLog: true,
+        canManageRetention: true,
+      },
+      RRHH: {
+        canUpload: true,
+        canDownload: true,
+        canDelete: false,
+        canViewAll: true,
+        canViewOwn: true,
+        canExport: true,
+        canViewAuditLog: false,
+        canManageRetention: false,
+      },
+      MANAGER: {
+        canUpload: false,
+        canDownload: true,
+        canDelete: false,
+        canViewAll: false,
+        canViewOwn: true, // Solo sus reportes
+        canExport: false,
+        canViewAuditLog: false,
+        canManageRetention: false,
+      },
+      EMPLOYEE: {
+        canUpload: false,
+        canDownload: true,
+        canDelete: false,
+        canViewAll: false,
+        canViewOwn: true, // Solo su propio legajo
+        canExport: false,
+        canViewAuditLog: false,
+        canManageRetention: false,
+      },
+      VIEWER: {
+        canUpload: false,
+        canDownload: true,
+        canDelete: false,
+        canViewAll: false,
+        canViewOwn: false,
+        canExport: false,
+        canViewAuditLog: false,
+        canManageRetention: false,
+      },
+    };
+
+    return configs[role] || configs.VIEWER;
+  }
+}</code></pre>
+
+      <h3>3.5 LegajoViewService</h3>
+      <p>Componer vista completa del legajo para UI.</p>
+
+      <pre><code>// src/modules/documents/services/legajo-view.service.ts
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+import { DocumentType } from '@prisma/client';
+
+interface LegajoView {
+  employeeId: string;
+  employeeName: string;
+  documentsByType: {
+    type: DocumentType;
+    label: string;
+    documents: any[];
+    count: number;
+  }[];
+  totalDocuments: number;
+  lastModified: Date;
+  uploadProgress: {
+    completed: number[];
+    missing: DocumentType[];
+  };
+}
+
+@Injectable()
+export class LegajoViewService {
+  // Tipos de documentos recomendados para completar legajo
+  private readonly recommendedDocTypes = [
+    DocumentType.CEDULA_IDENTIDAD,
+    DocumentType.CONTRATO,
+    DocumentType.CV,
+    DocumentType.CERTIFICADO_ESTUDIO,
+  ];
+
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * Obtener vista completa de legajo por empleado
+   */
+  async getLegajoView(tenantId: string, employeeId: string): Promise<LegajoView> {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    // Obtener documentos agrupados por tipo
+    const documents = await this.prisma.document.findMany({
+      where: {
+        tenantId,
+        employeeId,
+        status: 'ACTIVE',
+        deletedAt: null,
+      },
+      include: {
+        currentVersion: true,
+        metadata: true,
+      },
+      orderBy: { uploadedAt: 'desc' },
+    });
+
+    // Agrupar por tipo
+    const documentsByType = this.groupDocumentsByType(documents);
+
+    // Calcular estado de completado
+    const completed = documentsByType.map((g) => g.type);
+    const missing = this.recommendedDocTypes.filter((t) => !completed.includes(t));
+
+    return {
+      employeeId,
+      employeeName: employee?.firstName + ' ' + employee?.lastName,
+      documentsByType,
+      totalDocuments: documents.length,
+      lastModified: documents[0]?.uploadedAt || new Date(),
+      uploadProgress: { completed, missing },
+    };
+  }
+
+  private groupDocumentsByType(documents: any[]): any[] {
+    const grouped = new Map();
+
+    for (const doc of documents) {
+      if (!grouped.has(doc.type)) {
+        grouped.set(doc.type, {
+          type: doc.type,
+          label: this.getTypeLabel(doc.type),
+          documents: [],
+        });
+      }
+      grouped.get(doc.type).documents.push({
+        id: doc.id,
+        title: doc.title,
+        uploadedAt: doc.uploadedAt,
+        version: doc.currentVersion.versionNumber,
+        size: Number(doc.fileSize),
+      });
+    }
+
+    return Array.from(grouped.values()).map((g) => ({
+      ...g,
+      count: g.documents.length,
+    }));
+  }
+
+  private getTypeLabel(type: DocumentType): string {
+    const labels = {
+      CONTRATO: 'Contratos Laborales',
+      CV: 'Curriculum Vitae',
+      CEDULA_IDENTIDAD: 'Cédula de Identidad',
+      LICENCIA_CONDUCIR: 'Licencia de Conducir',
+      PASAPORTE: 'Pasaporte',
+      CERTIFICADO_ESTUDIO: 'Certificados de Estudio',
+      CERTIFICADO_LABORAL: 'Certificados Laborales',
+      CERTIFICADO_MEDICO: 'Certificados Médicos',
+      CONTRATO_BENEFICIOS: 'Contratos de Beneficios',
+      DOCUMENTO_FISCAL: 'Documentos Fiscales',
+      OTRO: 'Otros Documentos',
+    };
+    return labels[type] || 'Otros';
+  }
+}</code></pre>
+    </section>
+
+    <!-- Section 4: Controllers -->
+    <section id="controllers">
+      <h2>4. REST Controllers</h2>
+
+      <h3>4.1 DocumentController - Endpoints</h3>
+      <pre><code>// src/modules/documents/controllers/document.controller.ts
+
+import {
+  Controller,
+  Post,
+  Get,
+  Delete,
+  Param,
+  Body,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Query,
+  Res,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
+import { DocumentService } from '../services/document.service';
+import { RoleBasedAccessControlService } from '../services/rbac.service';
+import { DocumentAuditService } from '../services/document-audit.service';
+import { LegajoViewService } from '../services/legajo-view.service';
+import { JwtAuthGuard } from '@/auth/guards/jwt-auth.guard';
+import { CurrentUser } from '@/auth/decorators/current-user.decorator';
+import { DocumentType } from '@prisma/client';
+
+@Controller('api/v1/documents')
+@UseGuards(JwtAuthGuard)
+export class DocumentController {
+  private logger = new Logger(DocumentController.name);
+
+  constructor(
+    private documentService: DocumentService,
+    private rbacService: RoleBasedAccessControlService,
+    private auditService: DocumentAuditService,
+    private legajoViewService: LegajoViewService,
+  ) {}
+
+  // ===== UPLOAD =====
+  /**
+   * POST /api/v1/documents/upload
+   * Subir nuevo documento
+   */
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadDocument(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { tenantId: string; employeeId: string; documentType: string; title: string },
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    try {
+      // Validar permisos
+      await this.rbacService.checkPermission({
+        tenantId: body.tenantId,
+        userId: user.id,
+        role: user.role,
+        resourceType: 'DOCUMENT',
+        resourceId: body.employeeId,
+        action: 'UPLOAD',
+      });
+
+      const document = await this.documentService.uploadDocument({
+        file,
+        tenantId: body.tenantId,
+        employeeId: body.employeeId,
+        documentType: body.documentType as DocumentType,
+        title: body.title,
+        uploadedBy: user.id,
+      });
+
+      res.status(201).json({
+        success: true,
+        data: document,
+        message: 'Document uploaded successfully',
+      });
+    } catch (error) {
+      this.logger.error(`Upload failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // ===== DOWNLOAD =====
+  /**
+   * GET /api/v1/documents/:documentId/download
+   * Descargar archivo específico
+   */
+  @Get(':documentId/download')
+  async downloadDocument(
+    @Param('documentId') documentId: string,
+    @Query('tenantId') tenantId: string,
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ) {
+    try {
+      // Validar permisos
+      await this.rbacService.checkPermission({
+        tenantId,
+        userId: user.id,
+        role: user.role,
+        resourceType: 'DOCUMENT',
+        resourceId: documentId,
+        action: 'DOWNLOAD',
+      });
+
+      const fileBuffer = await this.documentService.downloadDocument(
+        documentId,
+        tenantId,
+        user.id,
+      );
+
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="document.bin"');
+      res.send(fileBuffer);
+    } catch (error) {
+      this.logger.error(`Download failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * GET /api/v1/documents/legajo/download/:employeeId
+   * Descargar legajo completo como ZIP
+   */
+  @Get('legajo/download/:employeeId')
+  async downloadLegajo(
+    @Param('employeeId') employeeId: string,
+    @Query('tenantId') tenantId: string,
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ) {
+    try {
+      const zipBuffer = await this.documentService.downloadLegajo({
+        tenantId,
+        employeeId,
+        requestedBy: user.id,
+      });
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="legajo_${employeeId}.zip"`);
+      res.send(zipBuffer);
+    } catch (error) {
+      this.logger.error(`Legajo download failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // ===== SEARCH =====
+  /**
+   * GET /api/v1/documents/search
+   * Buscar documentos con filtros
+   */
+  @Get('search')
+  async searchDocuments(
+    @Query('tenantId') tenantId: string,
+    @Query('employeeId') employeeId?: string,
+    @Query('documentType') documentType?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @CurrentUser() user: any,
+  ) {
+    const documents = await this.documentService.searchDocuments({
+      tenantId,
+      employeeId,
+      documentType: documentType as DocumentType,
+      dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+      dateTo: dateTo ? new Date(dateTo) : undefined,
+      requestedBy: user.id,
+    });
+
+    return {
+      success: true,
+      count: documents.length,
+      data: documents,
+    };
+  }
+
+  // ===== LEGAJO VIEW =====
+  /**
+   * GET /api/v1/documents/legajo/:employeeId
+   * Obtener vista completa del legajo
+   */
+  @Get('legajo/:employeeId')
+  async getLegajoView(
+    @Param('employeeId') employeeId: string,
+    @Query('tenantId') tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const legajo = await this.legajoViewService.getLegajoView(tenantId, employeeId);
+
+    return {
+      success: true,
+      data: legajo,
+    };
+  }
+
+  // ===== DELETE =====
+  /**
+   * DELETE /api/v1/documents/:documentId
+   * Eliminar documento (soft-delete)
+   */
+  @Delete(':documentId')
+  async deleteDocument(
+    @Param('documentId') documentId: string,
+    @Query('tenantId') tenantId: string,
+    @Body() body: { reason: string },
+    @CurrentUser() user: any,
+  ) {
+    try {
+      // Validar permisos
+      await this.rbacService.checkPermission({
+        tenantId,
+        userId: user.id,
+        role: user.role,
+        resourceType: 'DOCUMENT',
+        resourceId: documentId,
+        action: 'DELETE',
+      });
+
+      const deleted = await this.documentService.deleteDocument(
+        documentId,
+        tenantId,
+        user.id,
+        body.reason,
+      );
+
+      return {
+        success: true,
+        data: deleted,
+        message: 'Document deleted successfully',
+      };
+    } catch (error) {
+      this.logger.error(`Delete failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  // ===== AUDIT =====
+  /**
+   * GET /api/v1/documents/:documentId/audit
+   * Ver audit trail de documento
+   */
+  @Get(':documentId/audit')
+  async getDocumentAudit(
+    @Param('documentId') documentId: string,
+    @Query('tenantId') tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    // Validar permisos
+    await this.rbacService.checkPermission({
+      tenantId,
+      userId: user.id,
+      role: user.role,
+      resourceType: 'DOCUMENT',
+      resourceId: documentId,
+      action: 'VIEW_AUDIT',
+    });
+
+    const audit = await this.auditService.getDocumentAuditTrail(documentId);
+
+    return {
+      success: true,
+      count: audit.length,
+      data: audit,
+    };
+  }
+
+  /**
+   * GET /api/v1/documents/legajo/:employeeId/audit
+   * Ver audit trail completo de legajo
+   */
+  @Get('legajo/:employeeId/audit')
+  async getLegajoAudit(
+    @Param('employeeId') employeeId: string,
+    @Query('tenantId') tenantId: string,
+    @CurrentUser() user: any,
+  ) {
+    const audit = await this.auditService.getEmployeeLegajoAudit(employeeId);
+
+    return {
+      success: true,
+      count: audit.length,
+      data: audit,
+    };
+  }
+}</code></parameter>
+    </section>
+
+    <!-- Section 5: RBAC & Compliance -->
+    <section id="rbac">
+      <h2>5. Control de Acceso Basado en Roles (RBAC)</h2>
+
+      <h3>5.1 Matriz de Permisos por Rol</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Acción</th>
+            <th>Admin</th>
+            <th>RRHH</th>
+            <th>Manager</th>
+            <th>Employee</th>
+            <th>Viewer</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Subir documento</strong></td>
+            <td>✓ (todos)</td>
+            <td>✓ (todos)</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+          </tr>
+          <tr>
+            <td><strong>Descargar documento</strong></td>
+            <td>✓ (todos)</td>
+            <td>✓ (todos)</td>
+            <td>✓ (propios reportes)</td>
+            <td>✓ (propio)</td>
+            <td>✓ (asignados)</td>
+          </tr>
+          <tr>
+            <td><strong>Eliminar documento</strong></td>
+            <td>✓ (todos)</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+          </tr>
+          <tr>
+            <td><strong>Ver todos los legajos</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+          </tr>
+          <tr>
+            <td><strong>Ver legajo propio</strong></td>
+            <td>✓</td>
+            <td>✓</td>
+            <td>✓ (reportes)</td>
+            <td>✓</td>
+            <td>✗</td>
+          </tr>
+          <tr>
+            <td><strong>Descargar ZIP legajo</strong></td>
+            <td>✓ (todos)</td>
+            <td>✓ (todos)</td>
+            <td>✓ (reportes)</td>
+            <td>✓ (propio)</td>
+            <td>✗</td>
+          </tr>
+          <tr>
+            <td><strong>Ver audit log</strong></td>
+            <td>✓ (todos)</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+          </tr>
+          <tr>
+            <td><strong>Gestionar retención</strong></td>
+            <td>✓</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+            <td>✗</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>5.2 Cumplimiento Ley 29733 PDPA</h3>
+      <div class="card success">
+        <div class="card-title">Protección de Datos Personales</div>
+        <ul>
+          <li><strong>Consentimiento:</strong> Cada documento registra si requiere consentimiento y cuándo se obtuvo</li>
+          <li><strong>Encriptación:</strong> TLS en tránsito, MinIO puede usar encriptación en reposo</li>
+          <li><strong>Auditoría:</strong> Cada acceso se registra (quién, cuándo, qué, IP, navegador)</li>
+          <li><strong>Derecho al olvido:</strong> Soft-delete inmediato + hard-delete asincrónica (configurable: 30/90 días)</li>
+          <li><strong>Portabilidad:</strong> Descarga ZIP de legajo facilita exportación de datos</li>
+          <li><strong>Acceso limitado:</strong> RLS + RBAC = acceso mínimo necesario</li>
+        </ul>
+      </div>
+
+      <h3>5.3 Implementación de Derecho al Olvido</h3>
+      <pre><code>// src/modules/documents/jobs/document-retention.job.ts
+
+import { Injectable, Logger } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
+import { PrismaService } from '@/prisma/prisma.service';
+import { MinIOIntegrationService } from '../services/minio.integration';
+
+@Injectable()
+export class DocumentRetentionJob {
+  private logger = new Logger(DocumentRetentionJob.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private minioService: MinIOIntegrationService,
+  ) {}
+
+  /**
+   * Ejecutar cada día a las 2:00 AM
+   * Eliminar documentos marcados para eliminación después de 90 días
+   */
+  @Cron('0 2 * * *')
+  async handleDocumentRetention() {
+    const retentionDays = 90;
+    const retentionDate = new Date();
+    retentionDate.setDate(retentionDate.getDate() - retentionDays);
+
+    // Obtener documentos para eliminar
+    const documentsToDelete = await this.prisma.document.findMany({
+      where: {
+        status: 'DELETED',
+        deletedAt: { lte: retentionDate },
+      },
+      include: {
+        versions: true,
+      },
+    });
+
+    for (const doc of documentsToDelete) {
+      try {
+        // Eliminar versiones de MinIO
+        for (const version of doc.versions) {
+          await this.minioService.deleteFile(version.minioKey);
+        }
+
+        // Eliminar de BD
+        await this.prisma.document.delete({
+          where: { id: doc.id },
+        });
+
+        this.logger.log(`Hard-deleted document: ${doc.id}`);
+
+        // Audit log
+        await this.prisma.documentAuditLog.create({
+          data: {
+            tenantId: doc.tenantId,
+            documentId: doc.id,
+            action: 'DELETE',
+            performedBy: 'SYSTEM',
+            changeDetails: { type: 'hard_delete_retention' },
+          },
+        });
+      } catch (error) {
+        this.logger.error(`Failed to delete document ${doc.id}: ${error.message}`);
+      }
+    }
+  }
+}</code></pre>
+    </section>
+
+    <!-- Section 6: Casos de Prueba (TDD) -->
+    <section id="testing">
+      <h2>6. Casos de Prueba (Jest - TDD)</h2>
+
+      <h3>6.1 Document Service Tests</h3>
+      <pre><code>// src/modules/documents/services/__tests__/document.service.spec.ts
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { DocumentService } from '../document.service';
+import { MinIOIntegrationService } from '../minio.integration';
+import { DocumentAuditService } from '../document-audit.service';
+import { PrismaService } from '@/prisma/prisma.service';
+import { DocumentType, DocumentStatus } from '@prisma/client';
+import { NotFoundException, ForbiddenException } from '@nestjs/common';
+
+describe('DocumentService', () => {
+  let service: DocumentService;
+  let prismaService: PrismaService;
+  let minioService: MinIOIntegrationService;
+  let auditService: DocumentAuditService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        DocumentService,
+        {
+          provide: PrismaService,
+          useValue: {
+            document: {
+              create: jest.fn(),
+              findUnique: jest.fn(),
+              findMany: jest.fn(),
+              update: jest.fn(),
+            },
+            documentVersion: {
+              create: jest.fn(),
+            },
+            employee: {
+              findUnique: jest.fn(),
+            },
+            organization: {
+              findUnique: jest.fn(),
+            },
+            documentAuditLog: {
+              create: jest.fn(),
+            },
+          },
+        },
+        {
+          provide: MinIOIntegrationService,
+          useValue: {
+            uploadFile: jest.fn(),
+            downloadFile: jest.fn(),
+            deleteFile: jest.fn(),
+          },
+        },
+        {
+          provide: DocumentAuditService,
+          useValue: {
+            logAction: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<DocumentService>(DocumentService);
+    prismaService = module.get<PrismaService>(PrismaService);
+    minioService = module.get<MinIOIntegrationService>(MinIOIntegrationService);
+    auditService = module.get<DocumentAuditService>(DocumentAuditService);
+  });
+
+  describe('uploadDocument', () => {
+    it('should upload document successfully', async () => {
+      // Arrange
+      const mockFile = {
+        buffer: Buffer.from('test'),
+        originalname: 'test.pdf',
+        mimetype: 'application/pdf',
+        size: 4,
+      } as Express.Multer.File;
+
+      const uploadDto = {
+        file: mockFile,
+        tenantId: 'tenant-1',
+        employeeId: 'emp-1',
+        documentType: DocumentType.CONTRATO,
+        title: 'Contrato 2024',
+        uploadedBy: 'user-1',
+      };
+
+      jest.spyOn(prismaService.organization, 'findUnique').mockResolvedValue({
+        id: 'tenant-1',
+      } as any);
+
+      jest.spyOn(prismaService.employee, 'findUnique').mockResolvedValue({
+        id: 'emp-1',
+        tenantId: 'tenant-1',
+      } as any);
+
+      jest.spyOn(minioService, 'uploadFile').mockResolvedValue({
+        url: 'minio://path',
+        size: 4,
+        etag: 'etag123',
+      });
+
+      jest.spyOn(prismaService.document, 'create').mockResolvedValue({
+        id: 'doc-1',
+        tenantId: 'tenant-1',
+        employeeId: 'emp-1',
+        type: DocumentType.CONTRATO,
+        title: 'Contrato 2024',
+        uploadedBy: 'user-1',
+      } as any);
+
+      // Act
+      const result = await service.uploadDocument(uploadDto);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.id).toBe('doc-1');
+      expect(minioService.uploadFile).toHaveBeenCalled();
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'UPLOAD',
+          documentId: expect.any(String),
+        }),
+      );
+    });
+
+    it('should fail if employee not found', async () => {
+      // Arrange
+      jest.spyOn(prismaService.organization, 'findUnique').mockResolvedValue({
+        id: 'tenant-1',
+      } as any);
+
+      jest.spyOn(prismaService.employee, 'findUnique').mockResolvedValue(null);
+
+      const mockFile = {} as Express.Multer.File;
+      const uploadDto = {
+        file: mockFile,
+        tenantId: 'tenant-1',
+        employeeId: 'invalid-emp',
+        documentType: DocumentType.CONTRATO,
+        title: 'Contrato',
+        uploadedBy: 'user-1',
+      };
+
+      // Act & Assert
+      await expect(service.uploadDocument(uploadDto)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should fail if file size exceeds limit', async () => {
+      // Arrange
+      const largeBuffer = Buffer.alloc(150 * 1024 * 1024); // 150MB
+      const mockFile = {
+        buffer: largeBuffer,
+        originalname: 'large.pdf',
+        mimetype: 'application/pdf',
+      } as Express.Multer.File;
+
+      jest.spyOn(minioService, 'uploadFile').mockRejectedValue(
+        new Error('File size exceeds 100MB limit'),
+      );
+
+      // Act & Assert
+      await expect(minioService.uploadFile(largeBuffer, 'key', 'pdf')).rejects.toThrow();
+    });
+  });
+
+  describe('downloadDocument', () => {
+    it('should download document successfully', async () => {
+      // Arrange
+      const documentId = 'doc-1';
+      const tenantId = 'tenant-1';
+      const userId = 'user-1';
+
+      jest.spyOn(prismaService.document, 'findUnique').mockResolvedValue({
+        id: documentId,
+        tenantId,
+        currentVersion: {
+          minioKey: 'key/path',
+        },
+      } as any);
+
+      jest.spyOn(minioService, 'downloadFile').mockResolvedValue(Buffer.from('file content'));
+
+      // Act
+      const result = await service.downloadDocument(documentId, tenantId, userId);
+
+      // Assert
+      expect(result).toBeDefined();
+      expect(minioService.downloadFile).toHaveBeenCalledWith('key/path');
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'DOWNLOAD',
+          documentId,
+        }),
+      );
+    });
+
+    it('should fail if document not found', async () => {
+      // Arrange
+      jest.spyOn(prismaService.document, 'findUnique').mockResolvedValue(null);
+
+      // Act & Assert
+      await expect(
+        service.downloadDocument('invalid-doc', 'tenant-1', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('deleteDocument', () => {
+    it('should soft-delete document', async () => {
+      // Arrange
+      const documentId = 'doc-1';
+      const tenantId = 'tenant-1';
+
+      jest.spyOn(prismaService.document, 'findUnique').mockResolvedValue({
+        id: documentId,
+        tenantId,
+      } as any);
+
+      jest.spyOn(prismaService.document, 'update').mockResolvedValue({
+        id: documentId,
+        status: DocumentStatus.DELETED,
+        deletedAt: new Date(),
+      } as any);
+
+      // Act
+      const result = await service.deleteDocument(
+        documentId,
+        tenantId,
+        'user-1',
+        'Employee request',
+      );
+
+      // Assert
+      expect(result.status).toBe(DocumentStatus.DELETED);
+      expect(auditService.logAction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'DELETE',
+          changeDetails: expect.objectContaining({
+            reason: 'Employee request',
+            deletionType: 'soft_delete',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('searchDocuments', () => {
+    it('should search documents with filters', async () => {
+      // Arrange
+      const filters = {
+        tenantId: 'tenant-1',
+        employeeId: 'emp-1',
+        documentType: DocumentType.CONTRATO,
+        requestedBy: 'user-1',
+      };
+
+      jest.spyOn(prismaService.organization, 'findUnique').mockResolvedValue({
+        id: 'tenant-1',
+      } as any);
+
+      jest.spyOn(prismaService.document, 'findMany').mockResolvedValue([
+        {
+          id: 'doc-1',
+          tenantId: 'tenant-1',
+          employeeId: 'emp-1',
+          type: DocumentType.CONTRATO,
+        } as any,
+      ]);
+
+      // Act
+      const result = await service.searchDocuments(filters);
+
+      // Assert
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(DocumentType.CONTRATO);
+    });
+  });
+});
+</code></pre>
+
+      <h3>6.2 RBAC Service Tests</h3>
+      <pre><code>// src/modules/documents/services/__tests__/rbac.service.spec.ts
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { RoleBasedAccessControlService } from '../rbac.service';
+import { PrismaService } from '@/prisma/prisma.service';
+import { AccessLevel } from '@prisma/client';
+import { ForbiddenException } from '@nestjs/common';
+
+describe('RoleBasedAccessControlService', () => {
+  let service: RoleBasedAccessControlService;
+  let prismaService: PrismaService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        RoleBasedAccessControlService,
+        {
+          provide: PrismaService,
+          useValue: {
+            documentRolePermission: {
+              findUnique: jest.fn(),
+              upsert: jest.fn(),
+            },
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<RoleBasedAccessControlService>(RoleBasedAccessControlService);
+    prismaService = module.get<PrismaService>(PrismaService);
+  });
+
+  describe('checkPermission', () => {
+    it('ADMIN should have all permissions', async () => {
+      // Arrange
+      jest.spyOn(prismaService.documentRolePermission, 'findUnique').mockResolvedValue({
+        role: AccessLevel.ADMIN,
+        canUpload: true,
+        canDownload: true,
+        canDelete: true,
+        canViewAll: true,
+      } as any);
+
+      // Act & Assert
+      await expect(
+        service.checkPermission({
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          role: AccessLevel.ADMIN,
+          resourceType: 'DOCUMENT',
+          resourceId: 'doc-1',
+          action: 'DELETE',
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it('RRHH should be able to upload', async () => {
+      // Arrange
+      jest.spyOn(prismaService.documentRolePermission, 'findUnique').mockResolvedValue({
+        role: AccessLevel.RRHH,
+        canUpload: true,
+        canViewAll: true,
+      } as any);
+
+      // Act & Assert
+      await expect(
+        service.checkPermission({
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          role: AccessLevel.RRHH,
+          resourceType: 'DOCUMENT',
+          resourceId: 'emp-1',
+          action: 'UPLOAD',
+        }),
+      ).resolves.toBe(true);
+    });
+
+    it('RRHH should NOT be able to delete', async () => {
+      // Arrange
+      jest.spyOn(prismaService.documentRolePermission, 'findUnique').mockResolvedValue({
+        role: AccessLevel.RRHH,
+        canDelete: false,
+      } as any);
+
+      // Act & Assert
+      await expect(
+        service.checkPermission({
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          role: AccessLevel.RRHH,
+          resourceType: 'DOCUMENT',
+          resourceId: 'doc-1',
+          action: 'DELETE',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('EMPLOYEE can only view own documents', async () => {
+      // Arrange
+      jest.spyOn(prismaService.documentRolePermission, 'findUnique').mockResolvedValue({
+        role: AccessLevel.EMPLOYEE,
+        canViewOwn: true,
+        canViewAll: false,
+      } as any);
+
+      // Act & Assert
+      // Own resource - should pass
+      await expect(
+        service.checkPermission({
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          role: AccessLevel.EMPLOYEE,
+          resourceType: 'LEGAJO',
+          resourceId: 'user-1', // Same as userId
+          action: 'VIEW',
+        }),
+      ).resolves.toBe(true);
+
+      // Other's resource - should fail
+      await expect(
+        service.checkPermission({
+          tenantId: 'tenant-1',
+          userId: 'user-1',
+          role: AccessLevel.EMPLOYEE,
+          resourceType: 'LEGAJO',
+          resourceId: 'user-2', // Different
+          action: 'VIEW',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('initializeDefaultPermissions', () => {
+    it('should initialize default permissions for all roles', async () => {
+      // Arrange
+      jest.spyOn(prismaService.documentRolePermission, 'upsert').mockResolvedValue({} as any);
+
+      // Act
+      await service.initializeDefaultPermissions('tenant-1');
+
+      // Assert
+      expect(prismaService.documentRolePermission.upsert).toHaveBeenCalledTimes(5); // 5 roles
+    });
+  });
+});</code></pre>
+
+      <h3>6.3 MinIO Integration Tests</h3>
+      <pre><code>// src/modules/documents/services/__tests__/minio.integration.spec.ts
+
+import { Test, TestingModule } from '@nestjs/testing';
+import { MinIOIntegrationService } from '../minio.integration';
+import { ConfigService } from '@nestjs/config';
+import { BadRequestException } from '@nestjs/common';
+
+describe('MinIOIntegrationService', () => {
+  let service: MinIOIntegrationService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        MinIOIntegrationService,
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key) => {
+              const config = {
+                MINIO_ENDPOINT: 'localhost',
+                MINIO_PORT: 9000,
+                MINIO_USE_SSL: 'false',
+                MINIO_ACCESS_KEY: 'minioadmin',
+                MINIO_SECRET_KEY: 'minioadmin',
+                MINIO_REGION: 'us-east-1',
+                MINIO_BUCKET: 'hrms-documents',
+              };
+              return config[key];
+            }),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<MinIOIntegrationService>(MinIOIntegrationService);
+  });
+
+  describe('uploadFile', () => {
+    it('should reject files larger than 100MB', async () => {
+      // Arrange
+      const largeBuffer = Buffer.alloc(150 * 1024 * 1024);
+
+      // Act & Assert
+      await expect(
+        service.uploadFile(largeBuffer, 'key', 'application/pdf'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should accept files under 100MB', async () => {
+      // Arrange
+      const fileBuffer = Buffer.from('test data');
+      const minioKey = 'test/file.pdf';
+      const mimeType = 'application/pdf';
+
+      // Note: Este test necesitaría mock de Minio.Client
+      // Para ambiente real, usar MinIO local de desarrollo
+    });
+  });
+});</code></pre>
+    </section>
+
+    <!-- Section 7: Module Setup -->
+    <section id="module">
+      <h2>7. Configuración del Módulo NestJS</h2>
+
+      <pre><code>// src/modules/documents/documents.module.ts
+
+import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigModule } from '@nestjs/config';
+
+// Services
+import { DocumentService } from './services/document.service';
+import { MinIOIntegrationService } from './services/minio.integration';
+import { DocumentAuditService } from './services/document-audit.service';
+import { RoleBasedAccessControlService } from './services/rbac.service';
+import { LegajoViewService } from './services/legajo-view.service';
+
+// Controllers
+import { DocumentController } from './controllers/document.controller';
+
+// Jobs
+import { DocumentRetentionJob } from './jobs/document-retention.job';
+
+@Module({
+  imports: [ScheduleModule.forRoot(), ConfigModule],
+  providers: [
+    DocumentService,
+    MinIOIntegrationService,
+    DocumentAuditService,
+    RoleBasedAccessControlService,
+    LegajoViewService,
+    DocumentRetentionJob,
+  ],
+  controllers: [DocumentController],
+  exports: [
+    DocumentService,
+    MinIOIntegrationService,
+    RoleBasedAccessControlService,
+  ],
+})
+export class DocumentsModule {}</code></pre>
+
+      <p>Integrar en <code>app.module.ts</code>:</p>
+
+      <pre><code>// src/app.module.ts
+import { DocumentsModule } from './modules/documents/documents.module';
+
+@Module({
+  imports: [
+    // ... otros módulos
+    DocumentsModule,
+  ],
+})
+export class AppModule {}</code></pre>
+    </section>
+
+    <!-- Section 8: Integración Audit Logs -->
+    <section id="audit-integration">
+      <h2>8. Integración con Sistema de Audit Logs Existente</h2>
+
+      <h3>8.1 Correlación con AuditLog Base</h3>
+      <p>Suponiendo tabla <code>AuditLog</code> existente en el sistema:</p>
+
+      <pre><code>// Prisma schema - extender AuditLog existente
+model AuditLog {
+  id                String        @id @default(cuid())
+  tenantId          String
+  userId            String
+  resourceType      String        // "DOCUMENT", "LEGAJO", etc.
+  resourceId        String        // documentId, employeeId
+  action            String        // "UPLOAD", "DOWNLOAD", "DELETE"
+
+  // Timestamp
+  timestamp         DateTime      @default(now())
+
+  // Contexto
+  ipAddress         String?
+  userAgent         String?
+
+  // Detalles
+  details           Json?
+
+  // Compliance
+  status            String        @default("success") // success, error, denied
+  reason            String?
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([resourceType])
+  @@index([timestamp])
+}
+
+model DocumentAuditLog {
+  // ... (como se especificó antes)
+  // Puede tener referencia a AuditLog base si se requiere
+  auditLogId        String?       // Relación opcional
+}
+</code></pre>
+
+      <h3>8.2 Logging Centralizado</h3>
+      <pre><code>// src/modules/documents/services/document-audit.service.ts - Actualizado
+
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service';
+import { AuditService } from '@/audit/audit.service'; // Servicio central de auditoría
+
+@Injectable()
+export class DocumentAuditService {
+  constructor(
+    private prisma: PrismaService,
+    private auditService: AuditService, // Inyectar servicio central
+  ) {}
+
+  async logAction(dto: {
+    tenantId: string;
+    documentId: string;
+    action: string;
+    performedBy: string;
+    changeDetails?: any;
+    ipAddress?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    // Logging centralizado (para dashboard unificado)
+    await this.auditService.log({
+      tenantId: dto.tenantId,
+      userId: dto.performedBy,
+      resourceType: 'DOCUMENT',
+      resourceId: dto.documentId,
+      action: dto.action,
+      details: dto.changeDetails,
+      ipAddress: dto.ipAddress,
+      userAgent: dto.userAgent,
+    });
+
+    // Logging específico de documentos (para compliance PDPA)
+    await this.prisma.documentAuditLog.create({
+      data: {
+        tenantId: dto.tenantId,
+        documentId: dto.documentId,
+        action: dto.action,
+        performedBy: dto.performedBy,
+        changeDetails: dto.changeDetails,
+        ipAddress: dto.ipAddress,
+        userAgent: dto.userAgent,
+        consentVerified: true, // Siempre registrar con consentimiento
+      },
+    });
+  }
+}</code></pre>
+
+      <h3>8.3 Reporting de Cumplimiento</h3>
+      <div class="card">
+        <div class="card-title">Reportes PDPA Automáticos</div>
+        <p>El sistema genera reportes mensuales:</p>
+        <ul>
+          <li>Accesos a documentos por rol/usuario</li>
+          <li>Eliminaciones y motivos</li>
+          <li>Documentos sin consentimiento explícito</li>
+          <li>Descargas de legajos</li>
+          <li>Intentos denegados de acceso</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Section 9: Deployment & Config -->
+    <section id="deployment">
+      <h2>9. Configuración de Ambiente & Deployment</h2>
+
+      <h3>9.1 Variables de Entorno</h3>
+      <pre><code># .env.example
+
+# MinIO
+MINIO_ENDPOINT=minio.example.com
+MINIO_PORT=9000
+MINIO_USE_SSL=true
+MINIO_ACCESS_KEY=your_access_key
+MINIO_SECRET_KEY=your_secret_key
+MINIO_REGION=us-east-1
+MINIO_BUCKET=hrms-documents-prod
+
+# Database
+DATABASE_URL=postgresql://user:pass@localhost:5432/hrms_db
+
+# JWT
+JWT_SECRET=your_jwt_secret
+
+# Document Retention (days)
+DOCUMENT_RETENTION_DAYS=90
+
+# File Upload Limits
+MAX_FILE_SIZE=104857600  # 100MB en bytes
+
+# Feature Flags
+ENABLE_SOFT_DELETE=true
+ENABLE_AUDIT_LOGS=true
+ENABLE_PDPA_COMPLIANCE=true
+</code></pre>
+
+      <h3>9.2 Docker Compose (Desarrollo Local)</h3>
+      <pre><code>version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: hrms_db
+      POSTGRES_USER: hrms_user
+      POSTGRES_PASSWORD: hrms_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+  minio-create-bucket:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/hrms-documents-dev;
+      /usr/bin/mc version enable myminio/hrms-documents-dev;
+      "
+
+volumes:
+  postgres_data:
+  minio_data:
+</code></pre>
+    </section>
+
+    <!-- Section 10: Roadmap Fase 4 -->
+    <section id="roadmap">
+      <h2>10. Roadmap Fase 4+ (No MVP)</h2>
+
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-item-title">Firmas Digitales</div>
+          <div class="feature-item-desc">Integración con PKI/certificados para firmas legales de documentos.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Workflow de Aprobación</div>
+          <div class="feature-item-desc">Multi-step approval con notificaciones y escalación.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">ESS Sunat</div>
+          <div class="feature-item-desc">Expediente Simplificado Sunat para cumplimiento tributario.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">OCR & Extraction</div>
+          <div class="feature-item-desc">Extracción automática de datos de documentos escaneados.</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Notificaciones Push</div>
+          <div class="feature-item-desc">Alertas para documentos próximos a vencer (ej: licencias).</div>
+        </div>
+        <div class="feature-item">
+          <div class="feature-item-title">Analytics & BI</div>
+          <div class="feature-item-desc">Dashboard de métricos: documentos por tipo, acceso patterns, etc.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 11: Checklist MVP -->
+    <section id="checklist">
+      <h2>11. Checklist de Implementación</h2>
+
+      <div class="callout">
+        <strong>Sprint Planning:</strong> Distribuir las 8 tareas (~3-4 sprints de 2 semanas cada uno para un equipo de 2-3 devs)
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Tarea</th>
+            <th>Dependencias</th>
+            <th>Est. Días</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>1</strong></td>
+            <td>Schema Prisma + Migrations</td>
+            <td>—</td>
+            <td>3</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>2</strong></td>
+            <td>MinIO Integration Service</td>
+            <td>1</td>
+            <td>4</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>3</strong></td>
+            <td>Document Service (CRUD)</td>
+            <td>1, 2</td>
+            <td>6</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>4</strong></td>
+            <td>RBAC Service</td>
+            <td>1</td>
+            <td>4</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>5</strong></td>
+            <td>Document Controller (REST)</td>
+            <td>3, 4</td>
+            <td>5</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>6</strong></td>
+            <td>Audit Service + Logging</td>
+            <td>1, 3</td>
+            <td>3</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>7</strong></td>
+            <td>Jest Tests (Unit + Integration)</td>
+            <td>3, 4, 5, 6</td>
+            <td>8</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td><strong>8</strong></td>
+            <td>Documentation + Deployment</td>
+            <td>Todas</td>
+            <td>4</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="card success">
+        <div class="card-title">Total Estimado MVP</div>
+        <p><strong>~37 días de trabajo</strong> para equipo de 1-2 desarrolladores (4-6 semanas reales con overhead).</p>
+      </div>
+    </section>
+
+  </div>
+</body>
+</html>
