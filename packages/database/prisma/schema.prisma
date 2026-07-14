@@ -41,6 +41,15 @@ model Tenant {
   asistenciaResumenes     AsistenciaResumen[]
   configuracionAsistencia ConfiguracionAsistencia?
 
+  // Fase 3 — Documental
+  documentos          Document[]
+  documentoVersiones  DocumentVersion[]
+
+  // Fase 4 — ATS
+  vacantes       Vacante[]
+  candidatos     Candidato[]
+  candidatoNotas CandidatoNota[]
+
   @@map("tenant")
 }
 
@@ -57,6 +66,9 @@ model Sede {
   // Fase 2 — Asistencia
   marcaciones Marcacion[]
   geofences   Geofence[]
+
+  // Fase 4 — ATS
+  vacantes Vacante[]
 
   @@index([tenantId])
   @@map("sede")
@@ -166,6 +178,12 @@ model Employee {
   justificaciones     Justificacion[]
   horasExtras         HorasExtra[]
   asistenciaResumenes AsistenciaResumen[]
+
+  // Fase 3 — Documental
+  documentos Document[]
+
+  // Fase 4 — ATS: candidato contratado que se convirtió en trabajador (D.Leg. 728)
+  candidaturas Candidato[]
 
   @@unique([tenantId, tipoDocumento, numeroDocumento])
   @@index([tenantId])
@@ -567,4 +585,204 @@ model ConfiguracionAsistencia {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("configuracion_asistencia")
+}
+
+// ---------------------------------------------------------------------------
+// Fase 3 — Documental
+// Ver docs/superpowers/specs/2026-07-14-fase3-documental-design.html.
+// Los binarios viven en MinIO; aquí solo metadatos y punteros (ruta_minio).
+// La eliminación es soft-delete (estado = ELIMINADO vía UPDATE): la migración
+// 20260714100000_fase3_documental no otorga DELETE a ningún rol de aplicación.
+// La auditoría usa el AuditLog/trigger genérico de Fase 0 (sin tabla propia).
+// El control de acceso se resuelve con Permission/Role de Fase 0 (@RequirePermission).
+// ---------------------------------------------------------------------------
+
+enum TipoDocumento {
+  CONTRATO
+  CV
+  DNI
+  CERTIFICADO
+  MEMO
+  BOLETA
+  OTRO
+
+  @@map("tipo_documento")
+}
+
+enum EstadoDocumento {
+  ACTIVO
+  ELIMINADO
+
+  @@map("estado_documento")
+}
+
+// Metadatos del documento vigente de un trabajador. El contenido de la última
+// versión se referencia directamente (ruta_minio); el historial completo vive
+// en DocumentVersion.
+model Document {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+
+  tipo          TipoDocumento
+  nombreArchivo String        @map("nombre_archivo")
+  mimeType      String        @map("mime_type") @db.VarChar(100)
+  tamanoBytes   BigInt        @map("tamano_bytes")
+  checksumMd5   String        @map("checksum_md5") @db.VarChar(32)
+  rutaMinio     String        @map("ruta_minio") // clave del objeto en MinIO
+
+  estado EstadoDocumento @default(ACTIVO)
+
+  // LPDP (Ley 29733): consentimiento para documentos con datos personales
+  requiereConsentimiento Boolean   @default(false) @map("requiere_consentimiento")
+  consentimientoFecha    DateTime? @map("consentimiento_fecha")
+
+  // Soft-delete: nunca se borra la fila, solo se marca (estado = ELIMINADO)
+  eliminadoEn       DateTime? @map("eliminado_en")
+  motivoEliminacion String?   @map("motivo_eliminacion") @db.Text
+
+  subidoPor String @map("subido_por") @db.Uuid // user id que subió el documento
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  versiones DocumentVersion[]
+
+  @@index([tenantId, employeeId, tipo])
+  @@index([tenantId, estado])
+  @@map("documento")
+}
+
+// Historial de versiones (append-only): cada re-subida crea una versión nueva.
+model DocumentVersion {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+
+  numeroVersion Int    @map("numero_version") // 1, 2, 3... por documento
+  rutaMinio     String @map("ruta_minio")
+  checksumMd5   String @map("checksum_md5") @db.VarChar(32)
+  tamanoBytes   BigInt @map("tamano_bytes")
+
+  subidoPor String   @map("subido_por") @db.Uuid
+  creadoEn  DateTime @default(now()) @map("creado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, numeroVersion])
+  @@index([tenantId])
+  @@map("documento_version")
+}
+
+// ---------------------------------------------------------------------------
+// Fase 4 — ATS (reclutamiento)
+// Ver docs/superpowers/specs/2026-07-14-fase4-ats-design.md.
+// Los CVs de candidatos son datos personales de terceros (LPDP Ley 29733):
+// la migración 20260714200000_fase4_ats solo otorga acceso a "candidato" y
+// "candidato_nota" a app_rrhh/app_admin (los managers no acceden a CVs).
+// ---------------------------------------------------------------------------
+
+enum EstadoVacante {
+  ABIERTA
+  PAUSADA
+  CERRADA
+
+  @@map("estado_vacante")
+}
+
+enum EstadoCandidato {
+  APLICADO
+  REVISADO
+  ENTREVISTA
+  OFERTA
+  RECHAZADO
+  CONTRATADO
+
+  @@map("estado_candidato")
+}
+
+model Vacante {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+
+  titulo      String
+  descripcion String @db.Text
+  requisitos  Json // estructura libre: skills, experiencia, educación...
+
+  salarioMin Decimal? @map("salario_min") @db.Decimal(10, 2)
+  salarioMax Decimal? @map("salario_max") @db.Decimal(10, 2)
+
+  estado EstadoVacante @default(ABIERTA)
+
+  sedeId    String?   @map("sede_id") @db.Uuid // null = vacante sin sede específica
+  creadoPor String    @map("creado_por") @db.Uuid // user id que creó la vacante
+  cerradaEn DateTime? @map("cerrada_en")
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sede   Sede?  @relation(fields: [sedeId], references: [id], onDelete: SetNull)
+
+  candidatos Candidato[]
+
+  @@index([tenantId, estado])
+  @@map("vacante")
+}
+
+model Candidato {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String @map("tenant_id") @db.Uuid
+  vacanteId String @map("vacante_id") @db.Uuid
+
+  nombreCompleto String  @map("nombre_completo")
+  email          String  @db.VarChar(255) // normalizar a minúsculas en la capa de aplicación
+  telefono       String? @db.VarChar(20)
+
+  cvRutaMinio String @map("cv_ruta_minio") // clave del objeto CV en MinIO
+  cvParseado  Json?  @map("cv_parseado") // resultado de extracción con Claude (null hasta parsear)
+
+  estado EstadoCandidato @default(APLICADO)
+
+  // LPDP (Ley 29733): consentimiento del candidato para tratar sus datos
+  consentimientoLpdp Boolean @default(false) @map("consentimiento_lpdp")
+
+  // Si se contrata (D.Leg. 728), se enlaza al trabajador creado
+  employeeId String? @map("employee_id") @db.Uuid
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vacante  Vacante   @relation(fields: [vacanteId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  notas CandidatoNota[]
+
+  @@unique([vacanteId, email])
+  @@index([tenantId, estado])
+  @@index([tenantId, vacanteId])
+  @@map("candidato")
+}
+
+// Notas internas del equipo de reclutamiento sobre un candidato.
+model CandidatoNota {
+  id          String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String @map("tenant_id") @db.Uuid
+  candidatoId String @map("candidato_id") @db.Uuid
+
+  autorId String @map("autor_id") @db.Uuid // user id del autor
+  nota    String @db.Text
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  candidato Candidato @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, candidatoId])
+  @@map("candidato_nota")
 }

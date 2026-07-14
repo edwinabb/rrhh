@@ -15,9 +15,13 @@ export interface NormativeParameterRecord {
  */
 export interface NormativeParameterQueryClient {
   normativeParameter: {
-    findFirst: (args: unknown) => Promise<NormativeParameterRecord | null>;
-    update: (args: unknown) => Promise<NormativeParameterRecord>;
-    create: (args: unknown) => Promise<NormativeParameterRecord>;
+    // Sintaxis de método (no propiedad-función) a propósito: los métodos se
+    // chequean de forma bivariante bajo strictFunctionTypes, lo que permite
+    // pasar Prisma.TransactionClient (cuyo findFirst acepta args tipados,
+    // no unknown) además de mocks planos en tests.
+    findFirst(args: unknown): Promise<NormativeParameterRecord | null>;
+    update(args: unknown): Promise<NormativeParameterRecord>;
+    create(args: unknown): Promise<NormativeParameterRecord>;
   };
 }
 
