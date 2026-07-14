@@ -1,4 +1,4 @@
-import { Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
@@ -30,6 +30,17 @@ export class AuthController {
     });
 
     return { ok: true };
+  }
+
+  @Get('me')
+  me(@Req() req: Request) {
+    // El guard global de sesión ya garantiza userId/tenantId presentes.
+    return {
+      userId: req.session.userId,
+      tenantId: req.session.tenantId,
+      pgRole: req.session.pgRole,
+      permissions: req.session.permissions ?? [],
+    };
   }
 
   @Post('logout')
