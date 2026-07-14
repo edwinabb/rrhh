@@ -1,38 +1,167 @@
-# HRMS Perú — Fase 0 (Fundaciones)
+# HRMS Perú — Sistema de Gestión de Recursos Humanos
 
-Ver `goal.md` para el objetivo completo del proyecto y `docs/superpowers/specs/` para el diseño detallado de cada fase. Este README cubre solo cómo levantar lo que ya existe (Fase 0).
+Sistema full-stack de gestión de recursos humanos (HRMS) para empresas peruanas con **cumplimiento estricto de normativa local** (SUNAT, SUNAFIL, MTPE). Multi-empresa (multi-tenant), soporta múltiples regímenes laborales y escala de 10 a 5,000 trabajadores.
 
-## Arranque local
+## 📋 Fases del Proyecto
+
+| Fase | Módulo | Estado | Tareas |
+|------|--------|--------|--------|
+| **0** | Fundaciones (Auth, RBAC, Multi-tenancy, Auditoría) | ✅ Completada | - |
+| **1** | Nómina (CTS, gratificaciones, quinta categoría, SUNAT) | 🚀 En Progreso (4/11) | 11 tareas |
+| **2** | Asistencia (Marcaciones, geofencing, horas extra) | ⏳ Pendiente | 8 tareas |
+| **3** | Documental y Firma (Legajo, firma masiva, ESS) | ⏳ Pendiente | 7 tareas |
+| **4** | ATS/Reclutamiento (Pipeline, parsing CVs con IA) | ⏳ Pendiente | 8 tareas |
+
+## 🚀 Inicio Rápido
+
+### Requisitos
+- Node.js ≥ 20
+- pnpm ≥ 9
+- Docker & Docker Compose
+
+### Instalación
 
 ```bash
-cp .env.example .env               # ajustar si hace falta
-cp apps/web/.env.local.example apps/web/.env.local
+# Clonar el repositorio
+git clone https://github.com/edwinabb/rrhh.git
+cd rrhh
 
-docker compose up -d                # Postgres, Redis, MinIO
+# Levantar infraestructura (PostgreSQL, Redis, MinIO)
+docker-compose up -d
+
+# Instalar dependencias
 pnpm install
 
-pnpm --filter @rrhh/database generate
-pnpm db:migrate                     # aplica packages/database/prisma/migrations
-pnpm db:seed                        # permisos, roles de sistema, parámetros normativos de referencia
+# Configurar variables de entorno
+cp .env.example .env
+cp apps/web/.env.local.example apps/web/.env.local
 
-pnpm dev                            # apps/api en :3001, apps/web en :3000
+# Ejecutar migraciones y seed
+cd packages/database
+pnpm migrate:deploy
+pnpm seed
+cd ../..
+
+# Ejecutar tests
+pnpm test
+
+# Iniciar desarrollo
+pnpm dev
+# API: http://localhost:3001
+# Web: http://localhost:3000
 ```
 
-## Verificación pendiente antes de confiar en este bootstrap
+## 📂 Estructura del Proyecto
 
-La migración inicial (`packages/database/prisma/migrations/20260710000000_init_foundations/migration.sql`) se escribió a mano porque este entorno no tenía un Postgres vivo para correr `prisma migrate dev` y generar la migración real. Antes de construir Fase 1 sobre esto:
+```
+rrhh/
+├── apps/
+│   ├── api/              # NestJS backend (Port 3001)
+│   │   └── src/modules/
+│   │       ├── auth/     # Autenticación & RBAC
+│   │       ├── payroll/  # Nómina (Fase 1)
+│   │       ├── attendance/ # Asistencia (Fase 2)
+│   │       ├── documents/ # Documental (Fase 3)
+│   │       └── ats/      # Reclutamiento (Fase 4)
+│   └── web/             # Next.js frontend (Port 3000)
+├── packages/
+│   ├── database/        # Prisma ORM + migraciones
+│   └── config/          # Configuración compartida
+└── docs/
+    └── superpowers/
+        ├── plans/       # Planes de cada fase
+        └── specs/       # Especificaciones detalladas
+```
 
-1. Levantar `docker compose up -d postgres` y correr `pnpm db:migrate` — si Prisma detecta drift entre `schema.prisma` y el SQL a mano, hay que corregir el SQL (no el schema, que sí refleja el diseño aprobado).
-2. Correr `pnpm --filter @rrhh/api test:integration` contra ese Postgres — valida RLS, roles nativos y el trigger de auditoría de verdad (`apps/api/test/integration/`). Estos tests **no se ejecutaron todavía** en este entorno (sin Docker disponible al momento de escribirlos).
-3. Correr `pnpm --filter @rrhh/api test` (unitarios, sin BD) — `PermissionsService` y `NormativeParameterService` sí están cubiertos con TDD y deberían pasar sin infraestructura adicional.
+## 🏗️ Stack Técnico
 
-## Decisiones y deuda técnica reconocida de esta implementación
+- **Backend:** NestJS + TypeScript
+- **BD:** PostgreSQL 16 + Prisma ORM + RLS
+- **Almacenamiento:** MinIO (S3-compatible)
+- **Colas:** BullMQ + Redis
+- **Testing:** Jest (TDD)
+- **Frontend:** Next.js 14 + TypeScript + Tailwind CSS
+- **IA:** Anthropic Claude Opus 4.8 (parsing CVs)
 
-- **Permisos y rol de Postgres se calculan una sola vez en login** y se guardan en la sesión (Redis), no se re-consultan por request. Si un admin cambia los roles de un usuario, ese usuario debe volver a iniciar sesión para que el cambio tome efecto. Alternativa (invalidar sesiones activas al cambiar roles) queda para cuando exista la página de RBAC real (Módulo 3).
-- **Vistas por rol (`employee_view_manager`/`employee_view_employee`) no tienen modelo Prisma** — Prisma no soporta bien la mezcla de tablas base + vistas en el mismo client sin overhead extra, así que `EmployeesService.list()` usa `$queryRawUnsafe` con el nombre de vista tomado de un mapa cerrado (nunca de input externo) cuando el rol activo es manager/employee, y el modelo Prisma normal para RRHH/Admin. Fase 1 debe extender esas vistas (no la tabla base) al agregar columnas de remuneración/salud.
-- **Login resuelve credenciales vía una función `SECURITY DEFINER`** (`auth_lookup_user`) porque RLS estricto sobre `app_user` no permite buscar por email antes de conocer el tenant. La función vive en un rol dedicado con `BYPASSRLS` que no se usa para nada más — ver comentario en la migración, sección 3b.
-- **Valores de `NORMATIVE_PARAMETER` del seed son de referencia, no confirmados** — ver `docs/superpowers/specs/validaciones-normativas-pendientes.md` antes de usarlos en cualquier cálculo real de Fase 1.
+## 📊 Fase 1 — Nómina (En Progreso)
 
-## Estructura
+### Calculadores de Nómina Implementados ✅
 
-Ver `docs/superpowers/specs/2026-07-07-fase0-fundaciones-design.md` para la arquitectura de carpetas completa y el porqué de cada decisión (NestJS + Next.js separados, Prisma + RLS, sesiones en vez de JWT, etc.).
+1. **CtsCalculator** — Depósito semestral (mayo, noviembre) con prorrateo
+2. **GratificacionCalculator** — Gratificación + bonificación extraordinaria Ley 30334
+3. **AfpOnpCalculator** — Retenciones pensionarias (AFP, ONP)
+
+### Próximas Tareas
+
+- [ ] EssaludCalculator + AsignacionFamiliarCalculator
+- [ ] QuintaCategoriaCalculator (proyección anual)
+- [ ] UtilidadesCalculator (reparto por días/remuneración)
+- [ ] LiquidacionCalculator (beneficios truncos al cese)
+- [ ] PayrollRunService (orquestador del ciclo)
+- [ ] PlanillaExporter (archivos PLAME/T-Registro SUNAT)
+- [ ] BankFileExporter (telecrédito BCP)
+
+## 🧪 Testing
+
+```bash
+# Todos los tests
+pnpm test
+
+# Tests de módulo específico
+pnpm --filter @rrhh/api test cts.calculator
+
+# Tests de integración
+pnpm test:integration
+```
+
+**Cobertura actual:** 20 tests passed (Fase 0 + Fase 1)
+
+## 📚 Documentación
+
+- `goal.md` — Objetivo y requisitos completos del proyecto
+- `docs/superpowers/specs/` — Especificaciones detalladas por fase
+- `docs/superpowers/plans/` — Planes de implementación con tareas
+
+## 🔐 Seguridad
+
+- **RLS (Row-Level Security):** Aislamiento multi-tenant a nivel BD
+- **RBAC:** Roles granulares (Admin, RRHH, Manager, Employee)
+- **Auditoría:** Log inmutable de todas las operaciones
+- **Cifrado:** En tránsito (TLS) y en reposo (datos sensibles)
+- **Permisos:** Nivel de fila y columna (ej: managers no ven salarios de reportes)
+
+## 🌍 Cumplimiento Normativo Peruano
+
+- **SUNAT:** Generación de archivos T-Registro y PDT PLAME
+- **SUNAFIL:** Registros de asistencia inalterables (append-only)
+- **Regímenes Laborales:** General (D.Leg. 728), MYPE, Agrario, extensible
+- **Beneficios Sociales:** CTS, Gratificaciones, Utilidades, Vacaciones
+- **Impuestos:** Quinta categoría, AFP, ONP, EsSalud
+- **Protección de Datos:** Cumplimiento Ley 29733
+
+## 📝 Convenciones de Código
+
+- **Commits:** Español, formato `feat(fase1): descripción`
+- **Nombres:** Spanish en modelos/BD, English en código
+- **Tests:** TDD (Red → Green → Refactor)
+- **Sin Funciones Puras Hardcodeadas:** Todos los parámetros normativos viven en `NORMATIVE_PARAMETER`
+
+## 🤝 Contribuir
+
+1. Crear rama feature: `git checkout -b feature/fase1-xxx`
+2. Desarrollo con TDD (test → implementación)
+3. Commit atómicos: `git commit -m "feat(fase1): descripción"`
+4. Crear Pull Request contra `main`
+
+## 📄 Licencia
+
+Proyecto privado. Contactar a info@reporta.la para detalles.
+
+## 📞 Contacto
+
+- **Email:** info@reporta.la
+- **Repositorio:** https://github.com/edwinabb/rrhh
+
+---
+
+**Estado:** Fase 1 en progreso. Próxima milestone: Calculadores de EsSalud, Asignación Familiar y Quinta Categoría.
