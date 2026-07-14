@@ -6,6 +6,7 @@
  * en cualquier cálculo real de Fase 1.
  */
 import { PrismaClient } from './generated/client';
+import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
 
@@ -34,6 +35,23 @@ const PERMISSIONS = [
     descripcion: 'Crear una nueva versión de un parámetro normativo',
     esSensible: false,
   },
+  // Fase 1 — Nómina
+  { code: 'payroll.process', descripcion: 'Procesar el ciclo de planilla', esSensible: true },
+  { code: 'payroll.export', descripcion: 'Exportar planilla (PLAME, telecrédito)', esSensible: true },
+  // Fase 2 — Asistencia
+  { code: 'attendance.mark', descripcion: 'Registrar marcación propia', esSensible: false },
+  { code: 'attendance.justify', descripcion: 'Solicitar justificación de falta/tardanza', esSensible: false },
+  { code: 'attendance.approve', descripcion: 'Aprobar o rechazar justificaciones', esSensible: false },
+  { code: 'attendance.read', descripcion: 'Ver asistencia propia', esSensible: false },
+  { code: 'attendance.read.team', descripcion: 'Ver asistencia del equipo (dashboard)', esSensible: false },
+  // Fase 3 — Documental
+  { code: 'documents.upload', descripcion: 'Subir documentos al legajo', esSensible: false },
+  { code: 'documents.read', descripcion: 'Ver y descargar documentos del legajo', esSensible: false },
+  { code: 'documents.delete', descripcion: 'Eliminar documentos (soft-delete, Ley 29733)', esSensible: true },
+  // Fase 4 — ATS
+  { code: 'ats.read', descripcion: 'Ver vacantes', esSensible: false },
+  { code: 'ats.apply', descripcion: 'Registrar candidatos a una vacante', esSensible: false },
+  { code: 'ats.manage', descripcion: 'Gestionar vacantes, candidatos y contrataciones', esSensible: true },
 ] as const;
 
 // Roles de sistema (tenant_id null): plantilla que cada tenant puede clonar/editar
@@ -52,16 +70,43 @@ const SYSTEM_ROLES: Record<string, { descripcion: string; permissions: string[] 
       'employee.health.read',
       'audit_log.read',
       'normative_param.read',
+      'payroll.process',
+      'payroll.export',
+      'attendance.mark',
+      'attendance.justify',
+      'attendance.approve',
+      'attendance.read',
+      'attendance.read.team',
+      'documents.upload',
+      'documents.read',
+      'ats.read',
+      'ats.apply',
+      'ats.manage',
     ],
   },
   Manager: {
     descripcion:
       'Jefe de área: ve datos generales de sus reportes directos, NUNCA salud ni ingresos',
-    permissions: ['employee.read'],
+    permissions: [
+      'employee.read',
+      'attendance.mark',
+      'attendance.justify',
+      'attendance.approve',
+      'attendance.read',
+      'attendance.read.team',
+      'documents.read',
+      'ats.read',
+    ],
   },
   Employee: {
     descripcion: 'Colaborador: autoservicio sobre sus propios datos',
-    permissions: ['employee.read'],
+    permissions: [
+      'employee.read',
+      'attendance.mark',
+      'attendance.justify',
+      'attendance.read',
+      'documents.read',
+    ],
   },
 };
 
@@ -149,7 +194,139 @@ async function main() {
     });
   }
 
+  await seedDemoTenant();
+
   console.log('Seed completo.');
+}
+
+/**
+ * Tenant demo para desarrollo local. Idempotente (upserts por claves naturales).
+ * Credenciales: admin@demo.pe / Admin123! · rrhh@demo.pe / Rrhh123! ·
+ * empleado@demo.pe / Empleado123!
+ * Los usuarios se asignan a los roles de SISTEMA (tenantId null) — AuthService
+ * resuelve el rol de Postgres por role.nombre, no por tenant del rol.
+ */
+async function seedDemoTenant() {
+  console.log('Sembrando tenant demo...');
+  const tenant = await prisma.tenant.upsert({
+    where: { ruc: '20123456789' },
+    update: {},
+    create: {
+      ruc: '20123456789',
+      razonSocial: 'Demo Peru S.A.C.',
+      nombreComercial: 'Demo Perú',
+      direccionFiscal: 'Av. Javier Prado Este 123, San Isidro, Lima',
+    },
+  });
+
+  let sede = await prisma.sede.findFirst({
+    where: { tenantId: tenant.id, nombre: 'Sede Central Lima' },
+  });
+  if (!sede) {
+    sede = await prisma.sede.create({
+      data: {
+        tenantId: tenant.id,
+        nombre: 'Sede Central Lima',
+        direccion: 'Av. Javier Prado Este 123, San Isidro',
+      },
+    });
+  }
+
+  await prisma.geofence.upsert({
+    where: { tenantId_sedeId: { tenantId: tenant.id, sedeId: sede.id } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      sedeId: sede.id,
+      latitud: -12.0904,
+      longitud: -77.0355,
+      radioMetros: 150,
+      nombre: 'Oficina San Isidro',
+    },
+  });
+
+  await prisma.configuracionAsistencia.upsert({
+    where: { tenantId: tenant.id },
+    update: {},
+    create: { tenantId: tenant.id }, // defaults: 08:00-17:00, tolerancia 15 min
+  });
+
+  const demoUsers = [
+    { email: 'admin@demo.pe', password: 'Admin123!', rol: 'Admin', doc: '45678901', nombres: 'Ana', apellidos: 'Torres Quispe', sueldo: 8000, sistema: 'afp' as const },
+    { email: 'rrhh@demo.pe', password: 'Rrhh123!', rol: 'RRHH', doc: '41234567', nombres: 'Carlos', apellidos: 'Mendoza Ríos', sueldo: 5500, sistema: 'afp' as const },
+    { email: 'empleado@demo.pe', password: 'Empleado123!', rol: 'Employee', doc: '47890123', nombres: 'María', apellidos: 'García Flores', sueldo: 2500, sistema: 'onp' as const },
+  ];
+
+  for (const u of demoUsers) {
+    const user =
+      (await prisma.user.findUnique({ where: { email: u.email } })) ??
+      (await prisma.user.create({
+        data: { tenantId: tenant.id, email: u.email, passwordHash: await argon2.hash(u.password) },
+      }));
+
+    const role = await prisma.role.findFirstOrThrow({
+      where: { nombre: u.rol, tenantId: null, esSistema: true },
+    });
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      update: {},
+      create: { userId: user.id, roleId: role.id },
+    });
+
+    const employee = await prisma.employee.upsert({
+      where: {
+        tenantId_tipoDocumento_numeroDocumento: {
+          tenantId: tenant.id,
+          tipoDocumento: '01',
+          numeroDocumento: u.doc,
+        },
+      },
+      update: {},
+      create: {
+        tenantId: tenant.id,
+        sedeId: sede.id,
+        userId: user.id,
+        tipoDocumento: '01', // DNI (Tabla 3 SUNAT)
+        numeroDocumento: u.doc,
+        nombres: u.nombres,
+        apellidos: u.apellidos,
+      },
+    });
+
+    const contrato = await prisma.contrato.findFirst({ where: { employeeId: employee.id } });
+    if (!contrato) {
+      await prisma.contrato.create({
+        data: {
+          employeeId: employee.id,
+          regimenLaboral: 'general',
+          regimenLaboralSunat: '01', // D.Leg. 728 (Tabla 33)
+          tipoTrabajadorSunat: '21', // empleado (Tabla 8)
+          tipoContrato: 'indeterminado',
+          tipoContratoSunat: '01', // plazo indeterminado (Tabla 12)
+          fechaInicio: new Date('2025-01-02'),
+          jornada: { horasDia: 8, diasSemana: 5 },
+          remuneracionBasica: u.sueldo,
+        },
+      });
+    }
+
+    const regimen = await prisma.regimenPensionario.findFirst({ where: { employeeId: employee.id } });
+    if (!regimen) {
+      await prisma.regimenPensionario.create({
+        data: {
+          employeeId: employee.id,
+          sistema: u.sistema,
+          administradora: u.sistema === 'afp' ? 'integra' : null,
+          tipoComision: u.sistema === 'afp' ? 'flujo' : null,
+          codigoSunat: u.sistema === 'afp' ? '21' : '02', // Tabla 11
+          fechaAfiliacion: new Date('2025-01-02'),
+        },
+      });
+    }
+  }
+
+  console.log(`  Tenant demo: ${tenant.razonSocial} (RUC ${tenant.ruc})`);
+  console.log('  Usuarios: admin@demo.pe / Admin123! · rrhh@demo.pe / Rrhh123! · empleado@demo.pe / Empleado123!');
 }
 
 main()

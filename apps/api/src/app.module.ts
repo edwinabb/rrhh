@@ -9,6 +9,10 @@ import { SessionAuthGuard } from './modules/auth/session-auth.guard';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { NormativeParamsModule } from './modules/normative-params/normative-params.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { AtsModule } from './modules/ats/ats.module';
 
 @Module({
   imports: [
@@ -19,6 +23,10 @@ import { AuditModule } from './modules/audit/audit.module';
     EmployeesModule,
     NormativeParamsModule,
     AuditModule,
+    PayrollModule,
+    AttendanceModule,
+    DocumentsModule,
+    AtsModule,
   ],
   providers: [
     // Orden real de ejecución en Nest: guards -> interceptors, sin importar el

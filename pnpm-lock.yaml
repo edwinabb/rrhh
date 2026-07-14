@@ -148,6 +148,9 @@ importers:
         specifier: ^5.18.0
         version: 5.22.0(prisma@5.22.0)
     devDependencies:
+      argon2:
+        specifier: ^0.40.3
+        version: 0.40.3
       prisma:
         specifier: ^5.18.0
         version: 5.22.0
