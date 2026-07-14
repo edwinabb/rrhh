@@ -83,20 +83,24 @@ export function DashboardEquipo({
           {horasPorEmpleado.length > 0 && (
             <div className="mt-6 overflow-x-auto">
               <h3 className="text-sm font-semibold">Horas computables por empleado</h3>
-              <table className="mt-2 w-full max-w-md text-sm">
+              <table className="mt-2 w-full max-w-xl text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="py-2 pr-4 font-medium">Empleado</th>
-                    <th className="py-2 font-medium">Horas</th>
+                    <th className="py-2 pr-4 font-medium">Horas</th>
+                    <th className="py-2 pr-4 font-medium">Faltas injust.</th>
+                    <th className="py-2 font-medium">Tardanza (min)</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {horasPorEmpleado.map(([employeeId, horas]) => (
+                  {horasPorEmpleado.map(([employeeId, hc]) => (
                     <tr key={employeeId} className="border-b border-slate-100">
                       <td className="py-2 pr-4">
                         {nombresPorEmpleado.get(employeeId) ?? employeeId.slice(0, 8)}
                       </td>
-                      <td className="py-2">{horas.toFixed(2)}</td>
+                      <td className="py-2 pr-4">{hc.horasComputables.toFixed(2)}</td>
+                      <td className="py-2 pr-4">{hc.faltasInjustificadas}</td>
+                      <td className="py-2">{hc.tardanzasMinutos}</td>
                     </tr>
                   ))}
                 </tbody>

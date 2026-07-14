@@ -73,6 +73,13 @@ export interface Justificacion {
   creadoEn: string;
 }
 
+/** Horas computables de un empleado en el período (shape real del PayrollAttendanceExporter). */
+export interface HorasComputablesEmpleado {
+  horasComputables: number;
+  faltasInjustificadas: number;
+  tardanzasMinutos: number;
+}
+
 /** Respuesta de GET /attendance/dashboard/:periodo. */
 export interface DashboardEquipo {
   periodo: string;
@@ -85,7 +92,7 @@ export interface DashboardEquipo {
   totalTardanzaMinutos: number;
   totalHorasTrabajadas: number;
   totalHorasExtra: number;
-  horasComputablesPorEmpleado: Record<string, number>;
+  horasComputablesPorEmpleado: Record<string, HorasComputablesEmpleado>;
 }
 
 export interface EmployeeLite {
