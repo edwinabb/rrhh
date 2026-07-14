@@ -1,0 +1,25 @@
+{
+  "name": "rrhh",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "db:migrate": "pnpm --filter @rrhh/database prisma migrate dev",
+    "db:seed": "pnpm --filter @rrhh/database prisma db seed",
+    "db:studio": "pnpm --filter @rrhh/database prisma studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0",
+    "typescript": "^5.5.0",
+    "prettier": "^3.3.0"
+  },
+  "packageManager": "pnpm@9.7.0"
+}

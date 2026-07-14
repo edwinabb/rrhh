@@ -1,0 +1,319 @@
+// Fase 0 — Fundaciones. Ver docs/superpowers/specs/2026-07-07-fase0-fundaciones-design.md
+// para las decisiones detrás de este esquema (RLS, roles nativos de Postgres, vistas por rol).
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../generated/client"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_DATABASE_URL")
+  extensions = [pgcrypto]
+}
+
+// ---------------------------------------------------------------------------
+// Multi-tenancy e identidad
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ruc            String   @unique @db.VarChar(11)
+  razonSocial    String   @map("razon_social")
+  nombreComercial String? @map("nombre_comercial")
+  direccionFiscal String? @map("direccion_fiscal")
+  estado         String   @default("activo") @db.VarChar(20) // activo | suspendido
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sedes              Sede[]
+  users              User[]
+  roles              Role[]
+  employees          Employee[]
+  auditLogs          AuditLog[]
+
+  @@map("tenant")
+}
+
+model Sede {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  nombre    String
+  direccion String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employees Employee[]
+
+  @@index([tenantId])
+  @@map("sede")
+}
+
+model User {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  email        String    @unique @db.VarChar(255) // normalizar a minúsculas en la capa de aplicación
+  passwordHash String    @map("password_hash")
+  estado       String    @default("activo") @db.VarChar(20) // activo | bloqueado
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  tenant   Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  roles    UserRole[]
+  employee Employee?
+  auditLogs AuditLog[]
+
+  @@index([tenantId])
+  @@map("app_user")
+}
+
+// ---------------------------------------------------------------------------
+// RBAC
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String? @map("tenant_id") @db.Uuid // null = plantilla de sistema
+  nombre      String
+  descripcion String?
+  esSistema   Boolean @default(false) @map("es_sistema")
+
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@index([tenantId])
+  @@map("role")
+}
+
+model Permission {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String  @unique // ej. employee.salary.read
+  descripcion String?
+  esSensible  Boolean @default(false) @map("es_sensible") // flag para columnas salud/ingresos
+
+  roles RolePermission[]
+
+  @@map("permission")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_role")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permission")
+}
+
+// ---------------------------------------------------------------------------
+// Trabajador (esqueleto — se extiende en Fase 1)
+// ---------------------------------------------------------------------------
+
+model Employee {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  sedeId          String   @map("sede_id") @db.Uuid
+  userId          String?  @unique @map("user_id") @db.Uuid
+  managerId       String?  @map("manager_id") @db.Uuid
+  tipoDocumento   String   @map("tipo_documento") @db.VarChar(2) // codigo Tabla 3 SUNAT
+  numeroDocumento String   @map("numero_documento") @db.VarChar(15)
+  nombres         String
+  apellidos       String
+  estado          String   @default("activo") @db.VarChar(20) // activo | cesado
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sede    Sede      @relation(fields: [sedeId], references: [id])
+  user    User?     @relation(fields: [userId], references: [id])
+  manager Employee? @relation("EmployeeManager", fields: [managerId], references: [id])
+  reports Employee[] @relation("EmployeeManager")
+
+  contratos            Contrato[]
+  cuentasBancarias      CuentaBancaria[]
+  regimenesPensionarios RegimenPensionario[]
+  planillaDetalles      PlanillaDetalle[]
+  liquidacion           Liquidacion?
+
+  @@unique([tenantId, tipoDocumento, numeroDocumento])
+  @@index([tenantId])
+  @@index([managerId])
+  @@map("employee")
+}
+
+// ---------------------------------------------------------------------------
+// Fase 1 — Nómina
+// ---------------------------------------------------------------------------
+
+model Contrato {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId          String    @map("employee_id") @db.Uuid
+  regimenLaboral      String    @map("regimen_laboral") @db.VarChar(20) // general | mype | agrario
+  regimenLaboralSunat String    @map("regimen_laboral_sunat") @db.VarChar(2) // codigo Tabla 33
+  tipoTrabajadorSunat String    @map("tipo_trabajador_sunat") @db.VarChar(2) // codigo Tabla 8
+  tipoContrato        String    @map("tipo_contrato") @db.VarChar(30)
+  tipoContratoSunat   String    @map("tipo_contrato_sunat") @db.VarChar(2) // codigo Tabla 12
+  fechaInicio         DateTime  @map("fecha_inicio") @db.Date
+  fechaFin            DateTime? @map("fecha_fin") @db.Date // null = indeterminado
+  jornada             Json // horas/dias pactados
+  remuneracionBasica   Decimal  @map("remuneracion_basica") @db.Decimal(10, 2)
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("contrato")
+}
+
+model CuentaBancaria {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId  String  @map("employee_id") @db.Uuid
+  banco       String  @db.VarChar(3) // codigo Tabla 36
+  tipoCuenta  String  @map("tipo_cuenta") @db.VarChar(20)
+  numero      String  @db.VarChar(20)
+  cci         String? @db.VarChar(20)
+  esPrincipal Boolean @default(true) @map("es_principal")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("cuenta_bancaria")
+}
+
+model RegimenPensionario {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId      String   @map("employee_id") @db.Uuid
+  sistema         String   @db.VarChar(10) // afp | onp
+  administradora  String?  @db.VarChar(20) // nullable, solo afp: integra/horizonte/profuturo/prima/habitat
+  tipoComision    String?  @map("tipo_comision") @db.VarChar(10) // flujo | mixta, nullable
+  codigoSunat     String   @map("codigo_sunat") @db.VarChar(2) // codigo Tabla 11
+  fechaAfiliacion DateTime @map("fecha_afiliacion") @db.Date
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("regimen_pensionario")
+}
+
+model Concepto {
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String? @map("tenant_id") @db.Uuid // null = catálogo global
+  codigo         String  @db.VarChar(20)
+  codigoSunat    String  @map("codigo_sunat") @db.VarChar(4) // 4 digitos, Tabla 22
+  nombre         String
+  tipo           String  @db.VarChar(10) // ingreso | descuento
+  esRemunerativo Boolean @map("es_remunerativo")
+  afectoA        Json    @map("afecto_a") // essalud, onp, afp, quinta, cts, grati (derivado de Tabla 22)
+
+  @@unique([tenantId, codigo])
+  @@index([codigoSunat])
+  @@map("concepto")
+}
+
+model Planilla {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  periodo    String    @db.VarChar(7) // YYYY-MM
+  estado     String    @default("registrado") @db.VarChar(20) // registrado | procesado | cerrado
+  cerradoAt  DateTime? @map("cerrado_at")
+
+  detalles PlanillaDetalle[]
+
+  @@unique([tenantId, periodo])
+  @@index([tenantId])
+  @@map("planilla")
+}
+
+model PlanillaDetalle {
+  id                 String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  planillaId         String  @map("planilla_id") @db.Uuid
+  employeeId         String  @map("employee_id") @db.Uuid
+  conceptosCalculados Json   @map("conceptos_calculados")
+  netoPagar          Decimal @map("neto_pagar") @db.Decimal(10, 2)
+
+  planilla Planilla @relation(fields: [planillaId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([planillaId])
+  @@index([employeeId])
+  @@map("planilla_detalle")
+}
+
+model Provision {
+  id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId String   @map("tenant_id") @db.Uuid
+  periodo  String   @db.VarChar(7)
+  tipo     String   @db.VarChar(20) // cts | gratificacion | vacaciones
+  monto    Decimal  @db.Decimal(10, 2)
+
+  @@index([tenantId, periodo])
+  @@map("provision")
+}
+
+model Liquidacion {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  employeeId   String   @unique @map("employee_id") @db.Uuid
+  fechaCese    DateTime @map("fecha_cese") @db.Date
+  componentes  Json // cts_trunca, grati_trunca, vacaciones_truncas
+  generadoAt   DateTime @default(now()) @map("generado_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("liquidacion")
+}
+
+// ---------------------------------------------------------------------------
+// Motor de parámetros normativos (nacional, no por tenant)
+// ---------------------------------------------------------------------------
+
+model NormativeParameter {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  codigo         String    @db.VarChar(64) // UIT, RMV, ESSALUD_TASA...
+  valor          Json // escalar o estructura (tramos)
+  vigenciaDesde  DateTime  @map("vigencia_desde") @db.Date
+  vigenciaHasta  DateTime? @map("vigencia_hasta") @db.Date // null = vigente
+  descripcion    String?
+  createdBy      String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([codigo, vigenciaDesde])
+  @@map("normative_parameter")
+}
+
+// ---------------------------------------------------------------------------
+// Auditoría inmutable (poblada por trigger de Postgres, ver migración RLS)
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id                BigInt   @id @default(autoincrement())
+  tenantId          String?  @map("tenant_id") @db.Uuid
+  userId            String?  @map("user_id") @db.Uuid // null = acción de sistema
+  tabla             String
+  registroId        String?  @map("registro_id") @db.Uuid
+  accion            String   @db.VarChar(10) // INSERT | UPDATE | DELETE
+  valoresAnteriores Json?    @map("valores_anteriores")
+  valoresNuevos     Json?    @map("valores_nuevos")
+  ipOrigen          String?  @map("ip_origen") @db.Inet
+  userAgent         String?  @map("user_agent")
+  requestId         String?  @map("request_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, tabla, registroId])
+  @@map("audit_log")
+}

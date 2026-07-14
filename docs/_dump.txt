@@ -1,0 +1,321 @@
+=== SHEET: E5 Datos Trabajador (dims A1:E41) ===
+A1='ESTRUCTURA 5: "Datos del TRABAJADOR"'
+A3='Para importar en el T-Registro la información de los trabajadores de un empleador, incluyendo a prestadores de servicios a que se refiere el numeral ii) y iii) del literal d) del artículo 1° del Decreto Supremo N.° 018-2007-TR y modificatorias, elabore un archivo texto con el siguiente nombre: '
+A4='Nombre del archivo :  RP_###########.tra'
+A5='########### = Es el RUC del empleador que realizará la inscripción en el T-Registro.'
+A7='Estructura del archivo de texto'
+A9='Nro' | B9='Descripción' | C9='Tipo' | D9='Longitud máxima' | E9='Observaciones'
+A10=1 | B10='Tipo de documento del trabajador (TD)' | C10='Texto' | D10=2 | E10='Ver tabla 3. Solo tipo 01 - DNI; 04 – Carné de Extranjería; 07 - Pasaporte; 09 - Carné de Solicit. de Refugio; 22 - Carné de Ident.-RR EE; 23 - Carné PTP y 24 - Documento de identidad extranjero.'
+A11=2 | B11='N.° de documento del trabajador' | C11='Texto' | D11=15
+A12=3 | B12='País emisor del documento' | C12='Texto' | D12=3 | E12='Observación: Ver tabla 26. Obligatorio para los tipos de documento 07 -  Pasaporte y 24 - Documento de identidad extranjero”.'
+A13=4 | B13='Regimen Laboral (1)' | C13='Texto' | D13=2 | E13='Ver tabla 33'
+A14=5 | B14='Situación Educativa (2)' | C14='Texto' | D14=2 | E14='Ver tabla 9. No aplica a los TT: 23, 66 y 71.'
+A15=6 | B15='Ocupación' | C15='Texto' | D15=6 | E15='Ver tabla 10(S.Púb y otras entid) y T30 (Sector Privado). No aplica a los TT:23, 66 y 71.'
+A16=7 | B16='Discapacidad' | C16='Texto' | D16=1 | E16='1:Si / 0:No. No aplica al TT 66.'
+A17=8 | B17='CUSPP' | C17='Texto' | D17=12 | E17='Solo para trabajadores afiliados a una AFP.'
+A18=9 | B18='SCTR Pensión' | C18='Texto' | D18=1 | E18='0:Ninguno / 1:ONP / 2: Cía privada. No se habilita para los TT: 88 y 98.'
+A19=10 | B19='Tipo de contrato de trabajo/condición laboral (1)' | C19='Texto' | D19=2 | E19='Ver tabla 12.'
+A20=11 | B20='Sujeto a régimen alternativo, acumulativo o atípico de jornada de trabajo y descanso.' | C20='Texto' | D20=1 | E20='1:Si / 0:No. No aplica a los TT: 23, 66 y 71.'
+A21=12 | B21='Sujeto a jornada de trabajo máxima' | C21='Texto' | D21=1 | E21='1:Si / 0:No. No aplica a los TT: 23, 66 y 71.'
+A22=13 | B22='Sujeto a horario nocturno' | C22='Texto' | D22=1 | E22='1:Si / 0:No. No aplica a los TT: 23, 66 y 71.'
+A23=14 | B23='Es sindicalizado (1)' | C23='Texto' | D23=1 | E23='1:Si / 0:No.'
+A24=15 | B24='Periodicidad de la remuneración o ingreso (1)' | C24='Texto' | D24=1 | E24='Ver tabla 13.'
+A25=16 | B25='Monto de la remuneración básica inicial de los trabajadores sujetos al régimen del D.Leg. 728' | C25='Numérico' | D25='7,2' | E25='Aplicable a los trabajadores que se inscriban a partir de la entrada del T-Registro.'
+A26=17 | B26='Situación' | C26='Texto' | D26=2 | E26='Ver tabla 15. '
+A27=18 | B27='Rentas de 5ta categoría exoneradas (inciso e) del Art. 19 de la Ley del Impuesto a la Renta)' | C27='Texto' | D27=1 | E27='1:Si / 0:No. No aplica a los TT: 23, 66, 67 y 71.'
+A28=19 | B28='Situación especial del trabajador' | C28='Texto' | D28=1 | E28='Ver tabla 35. No aplica a los TT:23, 66 y 71.'
+A29=20 | B29='Tipo de pago (1)' | C29='Texto' | D29=1 | E29='Ver tabla 16.'
+A30=21 | B30='Categoría ocupacional del trabajador' | C30='Texto' | D30=2 | E30='Ver tabla 24. No aplica a los TT: 19, 20, 21, 23, 66 71, 88, 89, 90, 91 y 98.'
+A31=22 | B31='Convenio para evitar la doble tributación' | C31='Texto' | D31=1 | E31='Ver tabla 25. No aplica a los TT: 23, 66, 67 y 71.'
+A32=23 | B32='N.° de RUC' | C32='Texto' | D32=11 | E32='Solo para los CAS (tipo de trabajador = 67).'
+A34='Importante:'
+A35='(1) Datos no aplicables al tipo de trabajador 23, 66, 71 y 73.'
+A36='(2) Antes Nivel Educativo. Vigente a partir del 01/07/2014.'
+A37='Los campos deben estar separados por el carácter "|"'
+A38='Los datos numéricos deben registrarse sin comas.'
+A39='Pueden ser montos enteros (sin separador decimal).'
+A40='Si son decimales deben llevar separador (punto decimal) y dos dígitos decimales como máximo'
+
+=== SHEET: E6 Datos Pensionista (dims A1:AV25) ===
+A1='ESTRUCTURA 6: "Datos del PENSIONISTA"'
+A3='Para importar en el T-Registro la información de los pensionistas, elabore un archivo texto con el siguiente nombre: '
+A4='Nombre del archivo : RP_###########.pen'
+A5='########### = Es el RUC del empleador que realizará la inscripción en el T-Registro.'
+A7='Estructura del archivo de texto'
+A9='Nro' | B9='Descripción' | C9='Tipo' | D9='Longitud máxima' | E9='Observaciones'
+A10=1 | B10='Tipo de documento del pensionista (TD)' | C10='Texto' | D10=2 | E10='Ver tabla 3. Solo TD 01:DNI; 04:C.Extranjería y 07:Pasaporte.'
+A11=2 | B11='N.° de documento del pensionista' | C11='Texto' | D11=15
+A12=3 | B12='País emisor del documento' | C12='Texto' | D12=3 | E12='ver tabla 26. Solo para TD: 07 - Pasaporte.'
+A13=4 | B13='Tipo de pensionista' | C13='Texto' | D13=2 | E13='Ver tabla 8. Solo tipo 24 y 26.'
+A14=5 | B14='Régimen pensionario ' | C14='Texto' | D14=2 | E14='Ver tabla 11.'
+A15=6 | B15='CUSPP' | C15='Texto' | D15=12 | E15='Solo pensionistas de la AFP. Dato opcional. '
+A16=7 | B16='Tipo de pago' | C16='Texto' | D16=1 | E16='Ver tabla 16.'
+A19='Importante:'
+A20='- Se declara como pensionista a quien recibe pensión y es asegurado regular al Régimen Contributivo de la Seguridad Social en Salud - EsSalud.'
+A21='- Los campos deben estar separados por el carácter "|"'
+
+=== SHEET: E11 - Períodos (dims A1:E29) ===
+A1='ESTRUCTURA 11: "Datos de períodos"'
+A3='Para importar en el T-Registro los datos que registran periodicidad., elabore un archivo texto con el siguiente nombre: '
+A4='Nombre del archivo : RP_###########.per'
+A5='########## = Es el RUC del empleador que realiza la inscripción en el T-Registro.'
+A7='Estructura del archivo de texto'
+A9='Nro' | B9='Descripción' | C9='Tipo' | D9='Longitud máxima' | E9='Observaciones'
+A10=1 | B10='Tipo de documento' | C10='Texto' | D10=2 | E10='Ver tabla 3. Solo tipo 01 - DNI; 04 – Carné de Extranjería; 07 - Pasaporte; 09 - Carné de Solicit. de Refugio; 22 - Carné de Ident.-RR EE; 23 - Carné PTP y 24 - Documento de identidad extranjero.'
+A11=2 | B11='N.° de documento' | C11='Texto' | D11=15
+A12=3 | B12='País emisor del documento' | C12='Texto' | D12=3 | E12='Observación: Ver tabla 26. Obligatorio para los tipos de documento 07 -  Pasaporte y 24 - Documento de identidad extranjero.'
+A13=4 | B13='Categoría' | C13='Texto' | D13=1 | E13='Categoría: 1: Trabajador; 2: Pensionista;  4:Personal de Terceros y 5:Personal en Formación-modalidad formativa laboral.'
+A14=5 | B14='Tipo de registro' | C14='Texto' | D14=1 | E14='Tipo de registro:'
+E15='1: Período: De vínculo (trabajador), de pensionista, de formación (Personal en Formación modalidad formativa laboral y otros) y de destaque/desplace (Personal de Terceros).'
+E16='2: Tipo de trabajador.'
+E17='3: Régimen de Aseguramiento de Salud.'
+E18='4: Régimen pensionario.'
+E19='5: SCTR Salud.'
+A20=6 | B20='Fecha de inicio o reinicio' | C20='Fecha' | D20='-' | E20='En formato dd/mm/aaaa.'
+A21=7 | B21='Fecha de fin' | C21='Fecha' | D21='-' | E21='En formato dd/mm/aaaa.'
+A22=8 | B22='Indicador del tipo de registro a dar de alta o baja.' | C22='Texto' | D22=2 | E22='Motivo de fin de período: ver tabla 17.'
+E23='Tipo de trabajador: ver tabla 8.'
+E24='Régimen de Aseguramiento de Salud: ver tabla 32.'
+E25='Régimen Pensionario: ver tabla 11.'
+E26='SCTR Salud: 1 EsSalud y 2: EPS.'
+A27=9 | B27='EPS/Servicios Propios' | C27='Texto' | D27=1 | E27='Se registrará la EPS cuando se seleccione el Régimen de aseguramiento de salud del tipo 01 y 03.  Ver tabla 14.'
+
+=== SHEET: E14 - Trab.JorLab  (dims A1:F26) ===
+A1='ESTRUCTURA 14:  Trabajador - Datos de la Jornada Laboral'
+A3='Para importar en el PLAME la información de la jornada laboral por trabajador, elabore un archivo texto con el siguiente nombre: '
+A5='Nombre del archivo: ffffaaaamm###########.jor'
+A6='Donde:'
+A7='ffff = Es el código del formulario (0601)'
+A8='aaaa = Es el año del período que se está importando.'
+A9='mm = Es el mes del periodo que se está importando.'
+A10='########## = Es el RUC de la empresa a la que pertenece el trabajador.'
+A12='Estructura del archivo de texto:'
+A14='Nro' | B14='Descripción' | C14='Tipo' | D14='Longitud máxima' | E14='Observaciones'
+A15=1 | B15='Tipo de documento del trabajador' | C15='Texto' | D15=2 | E15='Ver tabla 3. Solo tipo 01 - DNI; 04 – Carné de Extranjería; 07 - Pasaporte; 09 - Carné de Solicit. de Refugio; 22 - Carné de Ident.-RR EE; 23 - PTP, 24 - Documento de identidad extranjero y 26 - Carné CPP.'
+A16=2 | B16='Número de documento del trabajador' | C16='Texto' | D16=15
+A17=3 | B17='Número de horas ordinarias trabajadas ' | C17='Numérico' | D17=3 | E17='Máximo 360'
+A18=4 | B18='Número de minutos ordinarios trabajados ' | C18='Numérico' | D18=2 | E18='Máximo 59'
+A19=5 | B19='Número de horas en sobretiempo trabajadas ' | C19='Numérico' | D19=3 | E19='Máximo 360'
+A20=6 | B20='Número de minutos en sobretiempo trabajados ' | C20='Numérico' | D20=2 | E20='Máximo 59'
+A22='Importante:'
+A23='Los campos deben estar separados por el carácter "|"'
+A24='Los datos numéricos deben registrarse sin comas.'
+A25='No aplica para los tipo 66, 71, 88, 98 de la Tabla 8.'
+
+=== SHEET: E18-Trab.Rem  (dims A1:F35) ===
+A1='ESTRUCTURA 18:  Trabajador - Detalle de ingresos, tributos y descuentos.'
+A3='Para importar en el PLAME la información de detalle de los conceptos remunerativos y/o no remunerativos, así como descuentos del trabajador, elabore un archivo texto con el siguiente nombre: '
+A4='Nombre del archivo: ffffaaaamm###########.rem'
+A5='Donde:'
+A6='ffff = Es el código del formulario (0601)'
+A7='aaaa = Es el año del período que se está importando.'
+A8='mm = Es el mes del periodo que se está importando.'
+A9='########### = Es el RUC de la empresa a la que pertenece el trabajador'
+A11='Estructura del archivo de texto:'
+A13='Nro' | B13='Descripción' | C13='Tipo' | D13='Longitud máxima' | E13='Observaciones'
+A14=1 | B14='Tipo de documento del trabajador' | C14='Texto' | D14=2 | E14='Ver tabla 3. Solo tipo 01 - DNI; 04 – Carné de Extranjería; 07 - Pasaporte; 09 - Carné de Solicit. de Refugio; 22 - Carné de Ident.-RR EE; 23 - PTP, 24 - Documento de identidad extranjero y 26 - Carné CPP.'
+A15=2 | B15='Número de documento del trabajador' | C15='Texto' | D15=15
+A16=3 | B16='Código de concepto remunerativo y/o no remunerativo' | C16='Numérico' | D16=4 | E16='Ver tabla 22. No incluir códigos 0100, 0200, 0300, 0400, 0500, 0600, 0603, 0604, 0607, 0610, 0612, 0616, 0800, 0802, 0804, 0806 y 0808.'
+A17=4 | B17='Monto devengado' | C17='Numérico' | D17='7,2' | E17='Obligatorio si se consignó importe en la columna de monto pagado /descontado.'
+A18=5 | B18='Monto pagado/descontado' | C18='Numérico' | D18='7,2' | E18='Obligatorio si se consignó importe en la columna de monto devengado.'
+A21='Importante:'
+A22='-  Los campos deben estar separados por el carácter "|"'
+A23=' - Los datos numéricos pueden ser montos enteros (sin separador decimal).  '
+A24='-   Si son decimales deben llevar separador (punto decimal) y dos dígitos decimales como máximo.'
+A25='- Para el caso de los códigos 700s (descuentos), 601, 602, 605, 606, 608, 609, 611, 613, 614, 615, 617, 618, 801, 803, 805, 807, 809, 810 y 811 sólo se considera el monto consignado en la columna pagado/descontado. '
+A26='- Para registrar los códigos 0601, 0606, 0608 y 0609, el régimen pensionario debe corresponder al Sistema Privado de Pensiones (Ver Tabla 11: tipos 21, 22, 23, 24 y 25).'
+A27='- Para registrar el concepto 0613, el trabajador debe tener Régimen Pensionario D. Ley 20530  (Ver Tabla 11: tipo 3).'
+A28='- Para registrar el concepto 0614, el trabajador debe tener Régimen Pensionario del Servicio Diplomático de la República SDR  (Ver Tabla 11: tipo 13).'
+A29='- Para registrar el concepto 0615, el trabajador debe tener Régimen de Pensioniones Militar - Policial (Ver Tabla 11: tipo 10 ú 11).'
+A30=' - Sólo si empleador es microempresa inscrita en el REMYPE podrá registrar los conceptos 126 ó 127 de la Tabla 22.'
+A31='- Para el concepto 617 en la columna monto devengado se consignará la base de cálculo y en la columna monto pagado se consignará la cuota retenida.  La base de cálculo corresponde a las remuneraciones devengadas hasta abril de 2012. (Concepto 617 incorporado en la versión 2.3 del PDT PLAME).'
+A34='- El concepto 618 solo aplica para trabajadores con Contrato Administrativo de Servicios - CAS.'
+
+=== SHEET: E19-Pens.ing (dims A1:H28) ===
+A1='ESTRUCTURA 19:  Pensionista - Detalle de ingresos, tributos y descuentos'
+A3='Para importar en el PLAME la información de ingresos y demás conceptos del pensionista, elabore un archivo texto con el siguiente nombre:'
+A5='Nombre del archivo: ffffaaaamm###########.pen'
+A6='Donde:'
+A7='ffff = Es el código del formulario (0601)'
+A8='aaaa = Es el año del período que se está importando.'
+A9='mm = Es el mes del periodo que se está importando.'
+A10='########### = Es el RUC de la empresa a la que pertenece el pensionista.'
+A12='Estructura del archivo de texto:'
+A14='Nro' | B14='Descripción' | C14='Tipo' | D14='Longitud máxima' | E14='Observaciones'
+A15=1 | B15='Tipo de documento del pensionista' | C15='Texto' | D15=2 | E15='Ver tabla 3.  Sólo tipos 01, 04 y 07.'
+A16=2 | B16='Número de documento del pensionista' | C16='Texto' | D16=15
+A17=3 | B17='Código de concepto o ingreso' | C17='Numérico' | D17=4 | E17='Ver tabla 22. No incluir códigos 0100, 0200, 0300, 0400, 0500, 0600, 0601, 0602, 0604, 0605, 0606, 0607, 0608, 0609, 0610, 0612, 0613, 0614, 0700, 0702, 0704, 0705, 0800, 0801, 0802, 0803, 0804, 0805, 0806, 0807, 0808, 0810, 811.'
+A18=4 | B18='Monto devengado' | C18='Numérico' | D18='7,2' | E18='Obligatorio si se consignó importe en la columna de monto pagado /descontado.'
+A19=5 | B19='Monto pagado / descontado' | C19='Numérico' | D19='7,2' | E19='Obligatorio si se consignó importe en la columna de monto devengado.'
+A22='Importante:'
+A23='-  Los campos deben estar separados por el carácter "|"'
+A24=' - Los datos numéricos pueden ser montos enteros (sin separador decimal).  '
+A25='   Si son decimales deben llevar separador (punto decimal) y dos dígitos decimales como máximo.'
+A26='- Para el caso de los códigos 703, 706, 707, 603, 611 y 809 sólo se considera el monto consignado en la columna pagado/descontado.'
+
+=== SHEET: E30 Cta. Abono Rem. (dims A1:E19) ===
+A1='ESTRUCTURA 30: "Datos de cuenta de abono de remuneraciones"'
+A3='Para importar información información en el T-Registro de la empresa del sistema financiero y de la cuenta en la que el empleador  abona al trabajador la remuneración, elabore un archivo texto con el siguiente nombre: '
+A4='Nombre del archivo :  RP_###########.cta'
+A5='########### = Es el RUC del empleador que realizará la inscripción en el T-Registro.'
+A7='Estructura del archivo de texto'
+A9='Nro' | B9='Descripción' | C9='Tipo' | D9='Longitud máxima' | E9='Observaciones'
+A10=1 | B10='Tipo de documento del trabajador (TD)' | C10='Texto' | D10=2 | E10='Ver tabla 3.  Aplica para los tipos de documento del trabajador.'
+A11=2 | B11='N.° de documento del trabajador' | C11='Texto' | D11=15
+A12=3 | B12='País emisor del documento' | C12='Texto' | D12=3 | E12='Observación: Ver tabla 26. Obligatorio para los tipos de documento 07 -  Pasaporte y 24 - Documento de identidad extranjero.'
+A13=4 | B13='Código de la entidad del sistema financiero' | C13='Texto' | D13=3 | E13='Ver tabla 36.'
+A14=5 | B14='Número de cuenta donde se abona la remuneración' | C14='Texto' | D14=20 | E14='Debe contener solo dato numérico.'
+A16='Importante:'
+A17='Información obligatoria cuando el Tipo de pago de la remuneración o ingreso es "Depósito en cuenta"'
+A18='No aplica para tipo de trabajador: 23, 66, 71 y 73.'
+A19='Los campos deben estar separados por el carácter "|".'
+
+=== SHEET: E12-Trab.Otras Rta5ta  (dims A1:E49) ===
+A1='ESTRUCTURA 12:  Trabajador - Otras Rentas de 5ta. Categoría (del período y regularización)'
+A3='Rentas y retenciones del ejercicio'
+A4='Para importar en el PLAME la información de los trabajadores que perciben rentas de quinta categoría de otros empleadores, elabore un archivo texto con el siguiente nombre: '
+A5='Nombre del archivo: ffffaaaamm###########.or5'
+A6='Donde:'
+A7='ffff = Es el código del formulario (0601)'
+A8='aaaa = Es el año del período que se está importando.'
+A9='mm = Es el mes del periodo que se está importando.'
+A10='########## = Es el RUC de la empresa a la que pertenece el trabajador.'
+A12='Estructura del archivo de texto:'
+A14='Nro' | B14='Descripción' | C14='Tipo' | D14='Longitud máxima' | E14='Observaciones'
+A15=1 | B15='Tipo de documento del trabajador' | C15='Texto' | D15=2 | E15='Ver tabla 3. Solo tipo 01 - DNI; 04 – Carné de Extranjería; 07 - Pasaporte; 09 - Carné de Solicit. de Refugio; 22 - Carné de Ident.-RR EE; 23 - PTP y 24 - Documento de identidad extranjero y 26 - Carné CPP.'
+A16=2 | B16='Número de documento del trabajador' | C16='Texto' | D16=15
+A17=3 | B17='RUC del otro empleador' | C17='Texto' | D17=11
+A18=4 | B18='Monto de la renta de quinta percibida en el otro empleador.' | C18='Numérico' | D18='7,2'
+A20='Importante:'
+A21=' - Los campos deben estar separados por el carácter "|"'
+A22=' - Los datos numéricos pueden ser montos enteros (sin separador decimal).  '
+A23='   Si son decimales deben llevar separador (punto decimal) y dos dígitos decimales como máximo.'
+A24=' - No aplica para los tipos 23, 66, 67, 71 y 73 de la Tabla 8.'
+A26='Rentas de 5ta Categoría otros empleadores del ejercicio anterior (regularización) '
+A27='Para importar en el PLAME la información de los trabajadores que en los meses de enero y febrero informaron haber percibido ingresos de 5ta en el ejercicio anterior, elabore un archivo texto con el siguiente nombre: '
+A29='Nombre del archivo: ffffaaaamm###########.REG'
+A30='Donde:'
+A31='ffff = Es el código del formulario (0601)'
+A32='aaaa = Es el año del período que se está importando.'
+A33='mm = Es el mes del periodo que se está importando.'
+A34='########## = Es el RUC de la empresa a la que pertenece el trabajador (declarante)'
+A36='Estructura del archivo de texto:'
+A38='Nro' | B38='Descripción' | C38='Tipo' | D38='Longitud máxima' | E38='Observaciones'
+A39=1 | B39='Tipo de documento del trabajador' | C39='Texto' | D39=2 | E39='Ver tabla 3. Solo tipos  01, 04 , 07 y 09.'
+A40=2 | B40='Número de documento del trabajador' | C40='Texto' | D40=15
+A41=3 | B41='RUC del otro empleador' | C41='Texto' | D41=11
+A42=4 | B42='Monto de la renta de quinta percibida en otro empleador en el ejercicio anterior - regularización.' | C42='Numérico' | D42='7,2' | E42=' '
+A44='Importante:'
+A45=' - Los campos deben estar separados por el carácter "|"'
+A46=' - Los datos numéricos pueden ser montos enteros (sin separador decimal).  '
+A47='   Si son decimales deben llevar separador (punto decimal) y dos dígitos decimales como máximo.'
+A48='- De ingresarse información en el archivo ffffaaaamm###########.REG, deberá ingresa información en la casilla 621 - Renta Quinta Categoría Regul. Ejerc anterior, pudiendo ser cero (0).'
+
+=== SHEET: E13 Derechohab Alta (dims A1:E67) ===
+A1='ESTRUCTURA 13: "Importar Datos de derechohabientes - ALTAS"'
+A3='Para importar información de los derechohabientes de los trabajadores, pensionistas  Prestadores de Servicios a que se refiere el numeral iii) del literal d) del artículo 1° del D.S. N.° 15-2010/TR de un determinado empleador, elabore un archivo texto con el siguiente nombre: '
+A4='Nombre del archivo: RD_RRRRRRRRRRR_DDMMAAAA_ALTA.TXT'
+A5='DONDE:'
+A6='RD: PREFIJO'
+A7='RRRRRRRRRRR = Es el RUC del empleador al que pertenece el trabajador o pensionista'
+A8='DDMMAAAA= Es la fecha en que se va a remitir el archivo a través de SOL.'
+A10='Estructura del archivo de texto'
+A12='Nro' | B12='Descripción' | C12='Tipo' | D12='Longitud máxima' | E12='Observaciones'
+A13=1 | B13='Tipo de documento del trabajador o pensionista' | C13='Texto' | D13=2 | E13='Ver tabla 3.  Sólo tipos 01, 04 y 07.'
+A14=2 | B14='Número de documento del trabajador o pensionista' | C14='Texto' | D14=15
+A15=3 | B15='Tipo de documento del derechohabiente' | C15='Texto' | D15=2 | E15='Ver tabla 3. Sólo tipos 01, 04 y 07.'
+A16=4 | B16='Número de documento del derechohabiente' | C16='Texto' | D16=15
+A17=5 | B17='País emisor del documento' | C17='Texto' | D17=3 | E17='Ver tabla 26.'
+A18=6 | B18='Fecha de nacimiento' | C18='Fecha' | D18='-' | E18='En formato dd/mm/aaaa'
+A19=7 | B19='Apellido paterno del derechohabiente' | C19='Texto' | D19=40
+A20=8 | B20='Apellido materno del derechohabiente' | C20='Texto' | D20=40
+A21=9 | B21='Nombres del derechohabiente' | C21='Texto' | D21=40
+A22=10 | B22='Sexo' | C22='Texto' | D22=1 | E22='1: Masculino / 2:Femenino'
+A23=11 | B23='Vínculo familiar' | C23='Texto' | D23=2 | E23='Ver tabla 19'
+A24=12 | B24='Tipo de Documento que acredita el vínculo' | C24='Texto' | D24=2 | E24='Ver tabla 27.'
+A25=13 | B25='N.° de Documento que acredita el vínculo' | C25='Texto' | D25=20 | E25='Obligatorio para el vínculo Concubino(a) e Hijo mayor de edad incapacitado permanente.'
+A26=14 | B26='Mes de concepción' | C26='Texto' | D26=6 | E26='Solo para Gestante. En formato mmaaaa.'
+A27=15 | B27='Dirección 1 del derechohabiente - tipo de vía (1)' | C27='Texto' | D27=2 | E27='Ver tabla 5. '
+A28=16 | B28='Dirección 1 del derechohabiente - Nombre de vía (1)' | C28='Texto' | D28=20
+A29=17 | B29='Dirección 1 del derechohabiente - Número de vía (1)' | C29='Texto' | D29=4
+A30=18 | B30='Dirección 1 del derechohabiente - Departamento (1)' | C30='Texto' | D30=4
+A31=19 | B31='Dirección 1 del derechohabiente - Interior (1)' | C31='Texto' | D31=4
+A32=20 | B32='Dirección 1 del derechohabiente - Manzana (1)' | C32='Texto' | D32=4
+A33=21 | B33='Dirección 1 del derechohabiente - Lote (1)' | C33='Texto' | D33=4
+A34=22 | B34='Dirección 1 del derechohabiente - Kilometro (1)' | C34='Texto' | D34=4
+A35=23 | B35='Dirección 1 del derechohabiente - Block (1)' | C35='Texto' | D35=4
+A36=24 | B36='Dirección 1 del derechohabiente - Etapa (1)' | C36='Texto' | D36=4
+A37=25 | B37='Dirección 1 del derechohabiente - Tipo de zona (1)' | C37='Texto' | D37=2 | E37='Ver tabla 6'
+A38=26 | B38='Dirección 1 del derechohabiente - Nombre de zona (1)' | C38='Texto' | D38=20
+A39=27 | B39='Dirección 1 del derechohabiente - Referencia (1)' | C39='Texto' | D39=40
+A40=28 | B40='Dirección 1 del derechohabiente - UBIGEO (1)' | C40='Texto' | D40=6 | E40='Ver tabla 28'
+A41=29 | B41='Dirección 2 del derechohabiente - Tipo de vía ' | C41='Texto' | D41=2 | E41='Ver tabla 5'
+A42=30 | B42='Dirección 2 del derechohabiente - Nombre de vía' | C42='Texto' | D42=20
+A43=31 | B43='Dirección 2 del derechohabiente - Número de vía' | C43='Texto' | D43=4
+A44=32 | B44='Dirección 2 del derechohabiente - Departamento' | C44='Texto' | D44=4
+A45=33 | B45='Dirección 2 del derechohabiente - Interior' | C45='Texto' | D45=4
+A46=34 | B46='Dirección 2 del derechohabiente - Manzana' | C46='Texto' | D46=4
+A47=35 | B47='Dirección 2 del derechohabiente - Lote' | C47='Texto' | D47=4
+A48=36 | B48='Dirección 2 del derechohabiente - Kilometro' | C48='Texto' | D48=4
+A49=37 | B49='Dirección 1 del derechohabiente - Block ' | C49='Texto' | D49=4
+A50=38 | B50='Dirección 1 del derechohabiente - Etapa' | C50='Texto' | D50=4
+A51=39 | B51='Dirección 2 del derechohabiente - Tipo de zona' | C51='Texto' | D51=2 | E51='Ver tabla 6'
+A52=40 | B52='Dirección 2 del derechohabiente - Nombre de zona' | C52='Texto' | D52=20
+A53=41 | B53='Dirección 2 del derechohabiente - Referencia' | C53='Texto' | D53=40
+A54=42 | B54='Dirección 2 del derechohabiente - UBIGEO' | C54='Texto' | D54=6 | E54='Ver tabla 28'
+A55=43 | B55='Indicador Centro Asistencial EsSalud' | C55='Texto' | D55=1 | E55='Se registrará este dato cuando el derechohabiente registre 2 direcciones. Indicará  1 para que se considere la Dirección 1 y 2 cuando se tome como referente la Dirección 2. La dirección que seleccione será considerada por el EsSalud para la asignación del Centro donde le brindará las prestaciones de salud.'
+A56=44 | B56='Teléfono – código de la ciudad  (larga distancia nacional)' | C56='Texto' | D56=2 | E56='Ver tabla 29'
+A57=45 | B57='Teléfono – número de teléfono ' | C57='Texto' | D57=10
+A58=46 | B58='Correo electrónico' | C58='Texto' | D58=50 | E58='Debe contener el símbolo arroba "@".'
+A61='Importante:'
+A63='(1) Solo se debe registrar información en los campos del 15 al 28, cuando el derechohabiente se identifique con Pasaporte, Carné de extranjería o DNI de menor de edad. Para DNI de mayores de edad, de consignarse información en la dirección 1, ésta no será registrada.'
+A65='Adicionalmente, el empleador podrá registrar una segunda dirección para todos los derechohabientes.'
+A66='Los campos deben estar separados por el carácter "|"'
+A67='Los datos numéricos deben registrarse sin comas.'
+
+=== SHEET: E15-Trab.DiaNoLabSub  (dims A1:H25) ===
+A1='ESTRUCTURA 15: Trabajador - Días subsidiados y otros no laborados.'
+A3='Para importar en el PLAME información de días subsidiados y otros días no laborados por tipo de suspensión de labores, elabore un archivo texto con el siguiente nombre:'
+A5='Nombre del archivo: ffffaaaamm###########.snl'
+A6='Donde:'
+A7='ffff = Es el código del formulario (0601)'
+A8='aaaa = Es el año del período que se está importando.'
+A9='mm = Es el mes del periodo que se está importando.'
+A10='########### = Es el RUC de la empresa a la que pertenece el trabajador.'
+A12='Estructura del archivo de texto:'
+A14='Nro' | B14='Descripción' | C14='Tipo' | D14='Longitud máxima' | E14='Observaciones'
+A15=1 | B15='Tipo de documento del trabajador' | C15='Texto' | D15=2 | E15='Ver tabla 3. Solo tipo 01 - DNI; 04 – Carné de Extranjería; 07 - Pasaporte; 09 - Carné de Solicit. de Refugio; 22 - Carné de Ident.-RR EE; 23 - PTP , 24 - Documento de identidad extranjero y 26 - Carné CPP.'
+A16=2 | B16='Número de documento del trabajador' | C16='Texto' | D16=15
+A17=3 | B17='Tipo de suspensión de la relación laboral' | C17='Texto' | D17=2 | E17='Ver tabla 21.                                                                      Los Días subsidiados por EsSalud deben registrarse con los tipo 21 y 22.   Los demás tipos de suspensión son Días no laborados y no subsidiados.'
+A18=4 | B18='Número de días de suspensión de labores' | C18='Numérico' | D18=2 | E18='Mínimo 0,  Máximo 31, según el período.'
+A21='Importante:'
+A22='- Los campos deben estar separados por el carácter "|"'
+A23='- Los datos numéricos deben registrarse sin comas.'
+A24='-  Sólo se registran los tipos 21 y 22 cuando el Régimen de Aseguramiento de Salud corresponde a 00, 01, 02, 03 ó 04 de la Tabla 32.'
+A25='-  No aplica para los tipos 66, 88 y 98 de la Tabla 8.'
+
+=== SHEET: E24 Derechohabientes Baja (dims A1:H31) ===
+A1='ESTRUCTURA 24: "Importar derechohabientes - BAJA"'
+A3='Para importar información de los derechohabientes a ser dados de baja, elabore un archivo texto.'
+A4='Nombre del archivo: RD_RRRRRRRRRRR_DDMMAAAA_BAJA.TXT'
+A5='DONDE:'
+A6='RD: PREFIJO'
+A7='RRRRRRRRRRR = Es el RUC del empleador al que pertenece el trabajador o pensionista'
+A8='DDMMAAAA= Es la fecha en que se va a remitir el archivo a través de SOL.'
+A10='Estructura del archivo de texto'
+A12='Nro' | B12='Descripción' | C12='Tipo' | D12='Longitud máxima' | E12='Observaciones'
+A13=1 | B13='Tipo de documento del trabajador o pensionista' | C13='Texto' | D13=2 | E13='Ver tabla 3. Solo tipos 01, 04 y 07.'
+A14=2 | B14='Número de documento del trabajador o pensionista' | C14='Texto' | D14=15
+A15=3 | B15='Tipo de documento del derechohabiente' | C15='Texto' | D15=2 | E15='Ver tabla 3. Solo tipos 01, 04 y 07.'
+A16=4 | B16='Número de documento del derechohabiente' | C16='Texto' | D16=15
+A17=5 | B17='País emisor del documento' | C17='Texto' | D17=3 | E17='Ver tabla 26'
+A18=6 | B18='Fecha de nacimiento' | C18='Fecha' | D18='-' | E18='En formato dd/mm/aaaa'
+A19=7 | B19='Apellido paterno del derechohabiente' | C19='Texto' | D19=40
+A20=8 | B20='Apellido materno del derechohabiente' | C20='Texto' | D20=40
+A21=9 | B21='Nombres del derechohabiente' | C21='Texto' | D21=40
+A22=10 | B22='Vínculo familiar' | C22='Texto' | D22=2 | E22='Ver tabla 19'
+A23=11 | B23='Fecha de baja' | C23='Fecha' | D23='-'
+A24=12 | B24='Motivo de baja' | C24='Texto' | D24=2 | E24='Ver tabla 20'
+A26='Importante:'
+A28='Los campos deben estar separados por el carácter "|"'
+

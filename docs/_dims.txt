@@ -1,0 +1,42 @@
+E5 Datos Trabajador -> A1:E41
+E6 Datos Pensionista -> A1:AV25
+E11 - Períodos -> A1:E29
+E14 - Trab.JorLab  -> A1:F26
+E18-Trab.Rem  -> A1:F35
+E19-Pens.ing -> A1:H28
+E30 Cta. Abono Rem. -> A1:E19
+E12-Trab.Otras Rta5ta  -> A1:E49
+E13 Derechohab Alta -> A1:E67
+E15-Trab.DiaNoLabSub  -> A1:H25
+E24 Derechohabientes Baja -> A1:H31
+---ALL SHEETNAMES---
+RESUMEN
+E1 Dec. - Estab. Propios
+E2 Emp. a quienes destaco
+E3 Emp. que me destacan
+E4 Datos Personales
+E5 Datos Trabajador
+E6 Datos Pensionista
+E7-PS 4ta
+E9 Datos-Mod. Formativa
+E10 Datos-Pers. Terceros
+E11 - Períodos
+E12-Trab.Otras Rta5ta 
+E13 Derechohab Alta
+E14 - Trab.JorLab 
+E15-Trab.DiaNoLabSub 
+E17 TraxEst
+E18-Trab.Rem 
+E19-Pens.ing
+E20-PS4.Comp.
+E21-ModFor.pago
+E22-PersTercSCTR 
+E23 PFL y PERS TERC
+E24 Derechohabientes Baja
+E25-Trab.SCTR-IES 
+E26 Trab.Otras cond.
+E27 Pen.Otras cond.
+E28 Semanas Contrib 
+E29 Estudios Concluidos
+E30 Cta. Abono Rem.
+E31 Afil a Org.Sind S.Público

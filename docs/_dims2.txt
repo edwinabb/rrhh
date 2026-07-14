@@ -1,0 +1,46 @@
+T3- Tipo Documento -> A1:L17
+T11 Reg. Pensionario -> A1:J28
+T12 Contratos -> A1:D36
+T13 Periodicidad -> A1:B8
+T16 Tipo de Pago -> A1:C11
+T22 Ing, Trib y Desc -> A1:AFL345
+T33 Régimen Laboral -> A1:G41
+T36 Entidad Bancaria -> A1:B50
+---all names---
+RESUMEN
+T1 Actividad
+T3- Tipo Documento
+T4 Nacionalidad
+T5 Via
+T6 Zona
+T8 Tipo Trab-Pens-PS
+T9 Situación Educativa
+TM B Trabajadores
+T10 Ocup SPub Pers Form
+T11 Reg. Pensionario
+T12 Contratos
+T13 Periodicidad
+T14 EPSSERV PROPIOS
+T15 Situación 
+T16 Tipo de Pago
+T17 Motivo fin del periodo
+T18 Tipo Modalidad Formativa
+T19 Vínculo familiar
+T20 Motivo Baja DH
+T21 Tipo Suspensión
+T22 Ing, Trib y Desc
+T23 Tipo Comprobante
+T24 Categoria Ocupacional
+T25 Convenios
+T26 País Emisor Dcto
+T27 Acredita Vinc. Fam
+T28 UBIGEO
+T29 Cod LDN
+T30 Ocupación S.Privado
+T31 Pliego Presup
+T32 Rég Aseg Salud
+T33 Régimen Laboral
+T34 Inst. Educ. y sus carreras
+T35 Situacion especial
+T36 Entidad Bancaria
+T37 Org.sindicales S.Públic 
