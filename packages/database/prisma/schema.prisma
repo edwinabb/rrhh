@@ -33,6 +33,14 @@ model Tenant {
   employees          Employee[]
   auditLogs          AuditLog[]
 
+  // Fase 2 — Asistencia
+  marcaciones             Marcacion[]
+  geofences               Geofence[]
+  justificaciones         Justificacion[]
+  horasExtras             HorasExtra[]
+  asistenciaResumenes     AsistenciaResumen[]
+  configuracionAsistencia ConfiguracionAsistencia?
+
   @@map("tenant")
 }
 
@@ -45,6 +53,10 @@ model Sede {
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employees Employee[]
+
+  // Fase 2 — Asistencia
+  marcaciones Marcacion[]
+  geofences   Geofence[]
 
   @@index([tenantId])
   @@map("sede")
@@ -149,6 +161,12 @@ model Employee {
   planillaDetalles      PlanillaDetalle[]
   liquidacion           Liquidacion?
 
+  // Fase 2 — Asistencia
+  marcaciones         Marcacion[]
+  justificaciones     Justificacion[]
+  horasExtras         HorasExtra[]
+  asistenciaResumenes AsistenciaResumen[]
+
   @@unique([tenantId, tipoDocumento, numeroDocumento])
   @@index([tenantId])
   @@index([managerId])
@@ -230,7 +248,8 @@ model Planilla {
   estado     String    @default("registrado") @db.VarChar(20) // registrado | procesado | cerrado
   cerradoAt  DateTime? @map("cerrado_at")
 
-  detalles PlanillaDetalle[]
+  detalles    PlanillaDetalle[]
+  horasExtras HorasExtra[] // Fase 2 — horas extra exportadas a esta planilla
 
   @@unique([tenantId, periodo])
   @@index([tenantId])
@@ -316,4 +335,236 @@ model AuditLog {
 
   @@index([tenantId, tabla, registroId])
   @@map("audit_log")
+}
+
+// ---------------------------------------------------------------------------
+// Fase 2 — Asistencia
+// Ver docs/superpowers/specs/2026-07-14-fase2-asistencia-design.md.
+// La tabla "marcacion" es append-only (SUNAFIL D.Leg. 910): la migración
+// 20260714000000_fase2_asistencia no otorga UPDATE/DELETE a ningún rol de
+// aplicación y una política RESTRICTIVE bloquea UPDATE/DELETE a nivel de RLS.
+// Las correcciones se registran como nuevas marcaciones o justificaciones.
+// ---------------------------------------------------------------------------
+
+enum TipoMarcacion {
+  ENTRADA
+  SALIDA
+  JUSTIFICACION
+
+  @@map("tipo_marcacion")
+}
+
+enum TipoIdentificacion {
+  HUELLA
+  FACIAL
+  PIN
+  QR
+  MANUAL
+
+  @@map("tipo_identificacion")
+}
+
+enum MotivoJustificacion {
+  TARDANZA // entrada tardía
+  FALTA // no se presentó
+  PERMISO // permiso justificado
+  LICENCIA // licencia personal o médica
+  CALAMIDAD // calamidad doméstica
+  EVENTO_EMPRESA // evento/reunión de empresa
+  TELETRABAJO // día de teletrabajo autorizado
+
+  @@map("motivo_justificacion")
+}
+
+enum EstadoJustificacion {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+
+  @@map("estado_justificacion")
+}
+
+enum TipoHoraExtra {
+  DIARIAS // exceso sobre el tope diario (>8h/día por defecto)
+  SEMANALES // exceso sobre el tope semanal (>48h/semana por defecto)
+
+  @@map("tipo_hora_extra")
+}
+
+// Registro append-only de cada marcación (entrada/salida/justificación).
+model Marcacion {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+  sedeId     String @map("sede_id") @db.Uuid
+
+  tipo      TipoMarcacion
+  timestamp DateTime      @default(now()) // momento del evento de marcación
+
+  // Geofencing
+  latitud             Float?
+  longitud            Float?
+  distanciaSedeMetros Float?  @map("distancia_sede_metros") // calculada contra el geofence al registrar
+  ubicacionValidada   Boolean @default(false) @map("ubicacion_validada")
+
+  // Biometría
+  tipoIdentificacion TipoIdentificacion? @map("tipo_identificacion")
+  scoreBiometria     Float?              @map("score_biometria") // confianza del match: 0.0 a 1.0
+  dispositivoId      String?             @map("dispositivo_id") // dispositivo biométrico de origen
+
+  // Justificación embebida (solo si tipo = JUSTIFICACION)
+  motivoJustificacion MotivoJustificacion? @map("motivo_justificacion")
+  documentoAdjuntoUrl String?              @map("documento_adjunto_url")
+  descripcion         String?              @db.Text
+
+  // Bloqueos y autorización pre-aprobada (se fija al crear, nunca por UPDATE)
+  bloqueado            Boolean   @default(false)
+  motivoBloqueo        String?   @map("motivo_bloqueo") // ej. "Fuera de sede y sin autorización"
+  requiereAutorizacion Boolean   @default(false) @map("requiere_autorizacion")
+  autorizadoPor        String?   @map("autorizado_por") @db.Uuid // user id del gerente/admin que autorizó
+  autorizadoEn         DateTime? @map("autorizado_en")
+
+  // Audit trail inmutable
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  creadoPor String   @map("creado_por") @db.Uuid // user id que registró la marcación
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  sede     Sede     @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  justificaciones Justificacion[]
+
+  @@index([tenantId, employeeId, timestamp])
+  @@index([tenantId, sedeId, timestamp])
+  @@map("marcacion")
+}
+
+// Centro y radio de validación GPS por sede (un geofence por sede).
+model Geofence {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  sedeId   String @map("sede_id") @db.Uuid
+
+  latitud     Float // coordenada central
+  longitud    Float // coordenada central
+  radioMetros Float @default(100) @map("radio_metros")
+
+  nombre      String // ej. "Oficina Centro Lima"
+  descripcion String? @db.Text
+
+  activo        Boolean  @default(true)
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sede   Sede   @relation(fields: [sedeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sedeId])
+  @@map("geofence")
+}
+
+// Solicitud formal de justificación de falta/tardanza, con flujo de aprobación.
+model Justificacion {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  employeeId  String  @map("employee_id") @db.Uuid
+  marcacionId String? @map("marcacion_id") @db.Uuid // puede existir justificación sin marcación previa
+
+  motivo MotivoJustificacion
+  fecha  DateTime            @db.Date // fecha del evento justificado
+
+  descripcion  String  @db.Text
+  documentoUrl String? @map("documento_url") // adjunto (imagen/PDF del justificante)
+
+  estado EstadoJustificacion @default(PENDIENTE)
+
+  aprobadoPor   String?   @map("aprobado_por") @db.Uuid // user id del gerente/admin
+  aprobadoEn    DateTime? @map("aprobado_en")
+  motivoRechazo String?   @map("motivo_rechazo") @db.Text
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee  Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  marcacion Marcacion? @relation(fields: [marcacionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, employeeId, estado])
+  @@index([tenantId, fecha])
+  @@map("justificacion")
+}
+
+// Horas extra calculadas automáticamente a partir de las marcaciones.
+model HorasExtra {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+
+  fecha DateTime      @db.Date // fecha del evento (para SEMANALES: último día de la semana)
+  tipo  TipoHoraExtra
+
+  horasCalculadas Float @map("horas_calculadas") // decimales: 1.5 = 1h30m
+
+  incluidoEnNomina Boolean @default(false) @map("incluido_en_nomina")
+  planillaId       String? @map("planilla_id") @db.Uuid // planilla que consumió estas horas
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  planilla Planilla? @relation(fields: [planillaId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, employeeId, fecha, tipo])
+  @@index([tenantId, incluidoEnNomina])
+  @@map("horas_extra")
+}
+
+// Resumen diario de asistencia (desnormalizado, recalculable desde marcacion).
+model AsistenciaResumen {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  employeeId String @map("employee_id") @db.Uuid
+
+  fecha DateTime @db.Date
+
+  horaEntrada DateTime? @map("hora_entrada")
+  horaSalida  DateTime? @map("hora_salida")
+
+  horasTrabajadas    Float @default(0) @map("horas_trabajadas")
+  horasExtrasDiarias Float @default(0) @map("horas_extras_diarias")
+
+  falta           Boolean @default(false)
+  tardanzaMinutos Int     @default(0) @map("tardanza_minutos")
+  justificado     Boolean @default(false)
+
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId, fecha])
+  @@index([tenantId, fecha])
+  @@map("asistencia_resumen")
+}
+
+// Parámetros de asistencia configurables por tenant (uno por tenant).
+model ConfiguracionAsistencia {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId String @unique @map("tenant_id") @db.Uuid
+
+  horaEntradaEstandar       String @default("08:00") @map("hora_entrada_estandar") @db.VarChar(5) // HH:mm
+  horaSalidaEstandar        String @default("17:00") @map("hora_salida_estandar") @db.VarChar(5) // HH:mm
+  toleranciaTardanzaMinutos Int    @default(15) @map("tolerancia_tardanza_minutos")
+
+  requiereGeofence  Boolean @default(true) @map("requiere_geofence")
+  requiereBiometria Boolean @default(false) @map("requiere_biometria")
+  umbralConfianzaBiometria Float @default(0.95) @map("umbral_confianza_biometria") // score mínimo aceptado: 0.0 a 1.0
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("configuracion_asistencia")
 }
