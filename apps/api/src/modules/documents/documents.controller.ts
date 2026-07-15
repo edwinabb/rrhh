@@ -49,6 +49,12 @@ const TIPOS_DOCUMENTO: readonly TipoDocumento[] = [
   'MEMO',
   'BOLETA',
   'OTRO',
+  'LIQUIDACION',
+  'CERTIFICADO_TRABAJO',
+  'CONSTANCIA_CESE',
+  'CERTIFICADO_RETENCION_5TA',
+  'CARTA_RENUNCIA',
+  'EXAMEN_MEDICO_RETIRO',
 ];
 
 /** tenantId/userId son nullables en el contexto; estos endpoints los exigen. */

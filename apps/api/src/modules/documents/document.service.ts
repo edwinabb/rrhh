@@ -15,7 +15,13 @@ export type TipoDocumento =
   | 'CERTIFICADO'
   | 'MEMO'
   | 'BOLETA'
-  | 'OTRO';
+  | 'OTRO'
+  | 'LIQUIDACION'
+  | 'CERTIFICADO_TRABAJO'
+  | 'CONSTANCIA_CESE'
+  | 'CERTIFICADO_RETENCION_5TA'
+  | 'CARTA_RENUNCIA'
+  | 'EXAMEN_MEDICO_RETIRO';
 
 export interface UploadDocumentInput {
   tenantId: string;
