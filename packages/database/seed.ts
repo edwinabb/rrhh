@@ -54,6 +54,12 @@ const PERMISSIONS = [
   { code: 'ats.read', descripcion: 'Ver vacantes', esSensible: false },
   { code: 'ats.apply', descripcion: 'Registrar candidatos a una vacante', esSensible: false },
   { code: 'ats.manage', descripcion: 'Gestionar vacantes, candidatos y contrataciones', esSensible: true },
+  // Fase 5 — Cese y Vacaciones
+  { code: 'termination.read', descripcion: 'Ver ceses y liquidaciones', esSensible: true },
+  { code: 'termination.manage', descripcion: 'Registrar ceses, corregir datos y calcular liquidaciones', esSensible: true },
+  { code: 'termination.approve', descripcion: 'Aprobar, pagar y anular liquidaciones', esSensible: true },
+  { code: 'vacation.read', descripcion: 'Ver récord vacacional', esSensible: false },
+  { code: 'vacation.manage', descripcion: 'Gestionar el récord vacacional', esSensible: false },
 ] as const;
 
 // Roles de sistema (tenant_id null): plantilla que cada tenant puede clonar/editar
@@ -86,6 +92,10 @@ const SYSTEM_ROLES: Record<string, { descripcion: string; permissions: string[] 
       'ats.read',
       'ats.apply',
       'ats.manage',
+      'termination.read',
+      'termination.manage',
+      'vacation.read',
+      'vacation.manage',
     ],
   },
   Manager: {
@@ -100,6 +110,7 @@ const SYSTEM_ROLES: Record<string, { descripcion: string; permissions: string[] 
       'attendance.read.team',
       'documents.read',
       'ats.read',
+      'vacation.read',
     ],
   },
   Employee: {
@@ -146,6 +157,31 @@ const NORMATIVE_PARAMETERS_SEED = [
     codigo: 'QUINTA_DEDUCCION_UIT',
     valor: 7,
     descripcion: 'Deducción fija Renta 5ta Categoría en UIT — valor de referencia sin confirmar',
+  },
+  {
+    codigo: 'INDEMNIZACION_TOPE_REMUNERACIONES',
+    valor: 12,
+    descripcion: 'Tope de indemnización por despido arbitrario, en remuneraciones (régimen general) — valor de referencia sin confirmar',
+  },
+  {
+    codigo: 'VACACIONES_DIAS_GENERAL',
+    valor: 30,
+    descripcion: 'Días de vacaciones por período — régimen general/agrario (D.Leg. 713) — valor de referencia sin confirmar',
+  },
+  {
+    codigo: 'VACACIONES_DIAS_MYPE',
+    valor: 15,
+    descripcion: 'Días de vacaciones por período — micro y pequeña empresa — valor de referencia sin confirmar',
+  },
+  {
+    codigo: 'MYPE_FACTOR_CTS_GRATI',
+    valor: { mype_pequena: 0.5, mype_micro: 0 },
+    descripcion: 'Factor de CTS/gratificación por régimen MYPE (D.S. 013-2013-PRODUCE) — valor de referencia sin confirmar',
+  },
+  {
+    codigo: 'INDEMNIZACION_MYPE',
+    valor: { mype_pequena: { diasPorAnio: 20, topeDias: 120 }, mype_micro: { diasPorAnio: 10, topeDias: 90 } },
+    descripcion: 'Indemnización por despido en MYPE: remuneraciones diarias por año y tope — valor de referencia sin confirmar',
   },
 ] as const;
 
