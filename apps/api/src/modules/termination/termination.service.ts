@@ -7,6 +7,7 @@ import {
 import { NormativeParameterService } from '../normative-params/normative-parameter.service';
 import { PeriodoVacacionalInput } from '../payroll/calculators/vacaciones.calculator';
 import { RegimenLaboral } from '../payroll/calculators/indemnizacion-despido.calculator';
+import { calcularLiquidacion, MotivoCese } from '../payroll/calculators/liquidacion.calculator';
 
 /**
  * Forma del inputSnapshot del Cese: TODOS los datos con los que se calcula la
@@ -45,7 +46,7 @@ export interface CrearCeseInput {
   tenantId: string;
   employeeId: string;
   fechaCese: Date;
-  motivo: string;
+  motivo: MotivoCese;
   creadoPor: string;
 }
 
@@ -157,6 +158,125 @@ export class TerminationService {
         ...(cambios.derechohabientes !== undefined
           ? { derechohabientes: cambios.derechohabientes }
           : {}),
+      },
+    });
+  }
+
+  async calcular(tx: any, ceseId: string): Promise<any> {
+    const cese = await this.obtenerCese(tx, ceseId);
+    if (cese.estado !== 'BORRADOR' && cese.estado !== 'CALCULADA') {
+      throw new ConflictException(
+        `Solo se calcula en BORRADOR o CALCULADA (estado actual: ${cese.estado})`,
+      );
+    }
+
+    const snapshot: CeseSnapshot = cese.inputSnapshot;
+    const fechaCese = new Date(cese.fechaCese);
+
+    // Parámetros normativos vigentes a la fecha del cese.
+    const resolve = (codigo: string) => this.normativeParams.resolve(tx, codigo, fechaCese);
+    const uit = (await resolve('UIT')) as number;
+    const rmv = (await resolve('RMV')) as number;
+    const tasaOnp = ((await resolve('ONP_TASA')) as number) ?? 0.13;
+    const tasaAfp = ((await resolve('AFP_APORTE_OBLIGATORIO')) as number) ?? 0.1;
+    const bonif = ((await resolve('GRATIFICACION_BONIF_EXTRAORD')) as any) ?? {
+      essalud: 0.09,
+      eps: 0.0675,
+    };
+    const deduccionUit = ((await resolve('QUINTA_DEDUCCION_UIT')) as number) ?? 7;
+    const factoresMype = ((await resolve('MYPE_FACTOR_CTS_GRATI')) as any) ?? {
+      mype_pequena: 0.5,
+      mype_micro: 0,
+    };
+    const topeIndemnizacion = ((await resolve('INDEMNIZACION_TOPE_REMUNERACIONES')) as number) ?? 12;
+    const indemnizacionMype = ((await resolve('INDEMNIZACION_MYPE')) as any) ?? {
+      mype_pequena: { diasPorAnio: 20, topeDias: 120 },
+      mype_micro: { diasPorAnio: 10, topeDias: 90 },
+    };
+
+    const factorRegimen =
+      snapshot.regimen === 'mype_micro'
+        ? factoresMype.mype_micro
+        : snapshot.regimen === 'mype_pequena'
+          ? factoresMype.mype_pequena
+          : 1;
+
+    // Tiempo de servicios para la indemnización por despido.
+    const inicioContrato = new Date(snapshot.fechaInicioContrato);
+    const servicio = mesesYDias(inicioContrato, fechaCese);
+    const mesesRestantesContrato = snapshot.fechaFinContrato
+      ? Math.max(0, mesesYDias(fechaCese, new Date(snapshot.fechaFinContrato)).meses)
+      : 0;
+
+    const resultado = calcularLiquidacion({
+      motivo: cese.motivo,
+      regimen: snapshot.regimen,
+      fechaCese,
+      remuneracionComputable: snapshot.remuneracionComputable,
+      factorRegimenCtsGrati: factorRegimen,
+      cts: snapshot.cts,
+      gratificacionTrunca: {
+        mesesCompletos: snapshot.gratificacionTrunca.mesesCompletos,
+        afiliadoEps: snapshot.afiliadoEps,
+        tasaBonifEssalud: bonif.essalud,
+        tasaBonifEps: bonif.eps,
+      },
+      vacaciones: {
+        periodos: snapshot.vacaciones.map((p) => ({
+          ...p,
+          periodoInicio: new Date(p.periodoInicio),
+          periodoFin: new Date(p.periodoFin),
+        })),
+        excluidoIndemnizacion: snapshot.excluidoIndemnizacionVacacional,
+      },
+      remuneracionesPendientes: snapshot.remuneracionesPendientes,
+      gratificacionExtraordinaria: snapshot.gratificacionExtraordinaria,
+      indemnizacionDespido:
+        cese.motivo === 'DESPIDO_ARBITRARIO'
+          ? {
+              tipoContrato: snapshot.tipoContrato,
+              aniosCompletos: Math.floor(servicio.meses / 12),
+              mesesAdicionales: servicio.meses % 12,
+              diasAdicionales: servicio.dias,
+              mesesRestantesContrato,
+              topeRemuneraciones: topeIndemnizacion,
+              mypeParams: indemnizacionMype,
+            }
+          : null,
+      deducciones: {
+        pension: {
+          sistema: snapshot.sistemaPensionario,
+          tasaOnp,
+          aportacionObligatoriaAfp: tasaAfp,
+          comisionAfp: 0.016, // TODO parametrizar (deuda declarada en payroll-run)
+          tipoComision: 'flujo',
+          primaSeguroAfp: 0.0174, // TODO parametrizar
+          topeRemuneracionMaximaAsegurable: 15 * rmv,
+        },
+        quinta: {
+          uit,
+          deduccionUit,
+          tramos: [
+            { hasta: 5 * uit, tasa: 0.08 },
+            { hasta: 20 * uit, tasa: 0.14 },
+            { hasta: 35 * uit, tasa: 0.17 },
+            { hasta: 45 * uit, tasa: 0.2 },
+            { hasta: Infinity, tasa: 0.3 },
+          ],
+          rentaPagadaEnElAnio: snapshot.quinta.rentaPagadaEnElAnio,
+          retencionesYaEfectuadas: snapshot.quinta.retencionesYaEfectuadas,
+        },
+      },
+    });
+
+    return tx.cese.update({
+      where: { id: ceseId },
+      data: {
+        estado: 'CALCULADA',
+        componentes: { ingresos: resultado.ingresos, deducciones: resultado.deducciones },
+        totalBruto: resultado.totalBruto,
+        totalDeducciones: resultado.totalDeducciones,
+        netoPagar: resultado.netoPagar,
       },
     });
   }
