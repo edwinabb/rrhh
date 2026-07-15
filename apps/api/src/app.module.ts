@@ -13,6 +13,7 @@ import { PayrollModule } from './modules/payroll/payroll.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { AtsModule } from './modules/ats/ats.module';
+import { VacationsModule } from './modules/vacations/vacations.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AtsModule } from './modules/ats/ats.module';
     AttendanceModule,
     DocumentsModule,
     AtsModule,
+    VacationsModule,
   ],
   providers: [
     // Orden real de ejecución en Nest: guards -> interceptors, sin importar el
