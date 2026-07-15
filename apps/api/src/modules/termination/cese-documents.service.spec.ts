@@ -10,7 +10,10 @@ const CESE = {
   motivo: 'RENUNCIA',
   componentes: {
     ingresos: [{ concepto: 'CTS trunca', baseLegal: 'D.S. 001-97-TR', monto: 1458.33 }],
-    deducciones: [{ concepto: 'Retención ONP', baseLegal: 'D.L. 19990', monto: -195 }],
+    deducciones: [
+      { concepto: 'Retención ONP', baseLegal: 'D.L. 19990', monto: -195 },
+      { concepto: 'Retención 5ta categoría', baseLegal: 'TUO LIR', monto: -100 },
+    ],
   },
   totalBruto: 1458.33,
   totalDeducciones: 195,

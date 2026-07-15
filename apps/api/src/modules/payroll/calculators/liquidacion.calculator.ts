@@ -22,6 +22,8 @@ import { calcularRetencionQuinta, TramoQuinta } from './quinta-categoria.calcula
  *   Vacaciones y remuneraciones pendientes → afectas a pensión y 5ta.
  *   Gratificación extraordinaria por cese (mutuo disenso) → no remunerativa, inafecta.
  */
+export const CONCEPTO_RETENCION_QUINTA = 'Retención 5ta categoría';
+
 export type MotivoCese =
   | 'RENUNCIA'
   | 'TERMINO_CONTRATO'
@@ -245,7 +247,7 @@ export function calcularLiquidacion(input: LiquidacionCeseInput): LiquidacionCes
     );
     if (retencion > 0) {
       deducciones.push({
-        concepto: 'Retención 5ta categoría',
+        concepto: CONCEPTO_RETENCION_QUINTA,
         baseLegal: 'TUO Ley Impuesto a la Renta, D.S. 179-2004-EF',
         monto: -retencion,
       });

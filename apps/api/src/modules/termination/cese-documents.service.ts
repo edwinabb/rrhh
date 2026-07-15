@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { DocumentService } from '../../modules/documents/document.service';
+import { CONCEPTO_RETENCION_QUINTA } from '../payroll/calculators/liquidacion.calculator';
 
 const MOTIVO_LABELS: Record<string, string> = {
   RENUNCIA: 'Renuncia voluntaria',
@@ -149,7 +150,7 @@ export class CeseDocumentsService {
     return this.crearPdf('CERTIFICADO DE RETENCIONES — RENTA 5TA CATEGORÍA', tenant, (doc) => {
       this.datosEmpleado(doc, cese, empleado);
       const retencionLiquidacion = cese.componentes.deducciones.find((l: any) =>
-        l.concepto.includes('5ta'),
+        l.concepto === CONCEPTO_RETENCION_QUINTA,
       );
       doc.text(`Renta pagada en el ejercicio: S/ ${cese.inputSnapshot.quinta.rentaPagadaEnElAnio.toFixed(2)}`);
       doc.text(
