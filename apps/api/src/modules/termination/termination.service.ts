@@ -1,0 +1,284 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { NormativeParameterService } from '../normative-params/normative-parameter.service';
+import { PeriodoVacacionalInput } from '../payroll/calculators/vacaciones.calculator';
+import { RegimenLaboral } from '../payroll/calculators/indemnizacion-despido.calculator';
+
+/**
+ * Forma del inputSnapshot del Cese: TODOS los datos con los que se calcula la
+ * liquidación, pre-llenados desde BD y corregibles por RRHH antes de calcular
+ * (trazabilidad: la hoja de liquidación siempre puede reproducirse).
+ */
+export interface CeseSnapshot {
+  regimen: RegimenLaboral;
+  tipoContrato: 'indeterminado' | 'plazo_fijo';
+  fechaInicioContrato: string; // ISO date
+  fechaFinContrato: string | null;
+  remuneracionComputable: number;
+  sistemaPensionario: 'afp' | 'onp';
+  afiliadoEps: boolean;
+  excluidoIndemnizacionVacacional: boolean;
+  cts: {
+    gratificacionSemestralPercibida: number;
+    mesesCompletosDesdeUltimoDeposito: number;
+    diasAdicionales: number;
+  };
+  gratificacionTrunca: { mesesCompletos: number };
+  vacaciones: PeriodoVacacionalInput[];
+  remuneracionesPendientes: Array<{ concepto: string; monto: number }>;
+  gratificacionExtraordinaria: number;
+  derechohabientes: Array<{
+    nombre: string;
+    tipoDocumento: string;
+    numeroDocumento: string;
+    parentesco: string;
+    porcentaje: number;
+  }> | null;
+  quinta: { rentaPagadaEnElAnio: number; retencionesYaEfectuadas: number };
+}
+
+export interface CrearCeseInput {
+  tenantId: string;
+  employeeId: string;
+  fechaCese: Date;
+  motivo: string;
+  creadoPor: string;
+}
+
+const DIAS_POR_MES = 30;
+
+/** Plazo legal de pago: 48 horas desde el cese (D.S. 001-97-TR). */
+export function calcularFechaLimitePago(fechaCese: Date): Date {
+  const limite = new Date(fechaCese);
+  limite.setUTCDate(limite.getUTCDate() + 2);
+  return limite;
+}
+
+/** Meses calendario completos + días sueltos desde `desde` hasta `hasta` (30/360). */
+function mesesYDias(desde: Date, hasta: Date): { meses: number; dias: number } {
+  let meses =
+    (hasta.getUTCFullYear() - desde.getUTCFullYear()) * 12 +
+    (hasta.getUTCMonth() - desde.getUTCMonth());
+  let dias = hasta.getUTCDate() - desde.getUTCDate();
+  if (dias < 0) {
+    meses -= 1;
+    dias += DIAS_POR_MES;
+  }
+  return { meses: Math.max(0, meses), dias: Math.max(0, dias) };
+}
+
+/** Inicio del período CTS vigente a una fecha: 1-may (may-oct) o 1-nov (nov-abr). */
+function inicioPeriodoCts(fecha: Date): Date {
+  const mes = fecha.getUTCMonth(); // 0-based
+  const anio = fecha.getUTCFullYear();
+  if (mes >= 4 && mes <= 9) return new Date(Date.UTC(anio, 4, 1)); // may-oct
+  if (mes >= 10) return new Date(Date.UTC(anio, 10, 1)); // nov-dic
+  return new Date(Date.UTC(anio - 1, 10, 1)); // ene-abr → nov del año anterior
+}
+
+/** Inicio del semestre de gratificación: 1-ene (ene-jun) o 1-jul (jul-dic). */
+function inicioSemestreGrati(fecha: Date): Date {
+  const anio = fecha.getUTCFullYear();
+  return fecha.getUTCMonth() < 6 ? new Date(Date.UTC(anio, 0, 1)) : new Date(Date.UTC(anio, 6, 1));
+}
+
+function redondear(monto: number): number {
+  return Math.round(monto * 100) / 100;
+}
+
+@Injectable()
+export class TerminationService {
+  constructor(private readonly normativeParams: NormativeParameterService) {}
+
+  async crearCese(tx: any, input: CrearCeseInput): Promise<any> {
+    const empleado = await tx.employee.findUnique({ where: { id: input.employeeId } });
+    if (!empleado) throw new NotFoundException(`Empleado ${input.employeeId} no encontrado`);
+
+    const ceseVigente = await tx.cese.findFirst({
+      where: { employeeId: input.employeeId, estado: { not: 'ANULADA' } },
+    });
+    if (ceseVigente || empleado.estado === 'cesado') {
+      throw new ConflictException('El empleado ya tiene un cese vigente');
+    }
+
+    const contrato = await tx.contrato.findFirst({
+      where: { employeeId: input.employeeId },
+      orderBy: { fechaInicio: 'desc' },
+    });
+    if (!contrato) throw new BadRequestException('El empleado no tiene contrato registrado');
+    if (input.fechaCese.getTime() < new Date(contrato.fechaInicio).getTime()) {
+      throw new BadRequestException('La fecha de cese es anterior al inicio del contrato');
+    }
+    if (input.motivo === 'TERMINO_CONTRATO' && !contrato.fechaFin) {
+      throw new BadRequestException(
+        'TERMINO_CONTRATO requiere un contrato a plazo fijo (con fecha de fin)',
+      );
+    }
+
+    const snapshot = await this.preLlenarSnapshot(tx, input, contrato);
+
+    return tx.cese.create({
+      data: {
+        tenantId: input.tenantId,
+        employeeId: input.employeeId,
+        fechaCese: input.fechaCese,
+        motivo: input.motivo,
+        estado: 'BORRADOR',
+        inputSnapshot: snapshot,
+        fechaLimitePago: calcularFechaLimitePago(input.fechaCese),
+        creadoPor: input.creadoPor,
+      },
+    });
+  }
+
+  async actualizarDatos(tx: any, ceseId: string, cambios: Partial<CeseSnapshot>): Promise<any> {
+    const cese = await this.obtenerCese(tx, ceseId);
+    if (cese.estado !== 'BORRADOR' && cese.estado !== 'CALCULADA') {
+      throw new ConflictException(
+        `Los datos solo se corrigen en BORRADOR o CALCULADA (estado actual: ${cese.estado})`,
+      );
+    }
+    return tx.cese.update({
+      where: { id: ceseId },
+      data: {
+        estado: 'BORRADOR', // toda corrección invalida el cálculo anterior
+        inputSnapshot: { ...cese.inputSnapshot, ...cambios },
+        componentes: null,
+        totalBruto: null,
+        totalDeducciones: null,
+        netoPagar: null,
+        ...(cambios.gratificacionExtraordinaria !== undefined
+          ? { gratificacionExtraordinaria: cambios.gratificacionExtraordinaria }
+          : {}),
+        ...(cambios.derechohabientes !== undefined
+          ? { derechohabientes: cambios.derechohabientes }
+          : {}),
+      },
+    });
+  }
+
+  /** Pre-llenado del snapshot: mejores datos disponibles, todo corregible por RRHH. */
+  private async preLlenarSnapshot(
+    tx: any,
+    input: CrearCeseInput,
+    contrato: any,
+  ): Promise<CeseSnapshot> {
+    const remuneracion = contrato.remuneracionBasica.toNumber
+      ? contrato.remuneracionBasica.toNumber()
+      : Number(contrato.remuneracionBasica);
+
+    const regimenPensionario = await tx.regimenPensionario.findFirst({
+      where: { employeeId: input.employeeId },
+    });
+
+    // CTS: meses/días desde el inicio del período semestral vigente (may/nov),
+    // sin exceder la fecha de ingreso si es posterior.
+    const inicioCts = inicioPeriodoCts(input.fechaCese);
+    const desdeCts =
+      new Date(contrato.fechaInicio).getTime() > inicioCts.getTime()
+        ? new Date(contrato.fechaInicio)
+        : inicioCts;
+    const cts = mesesYDias(desdeCts, input.fechaCese);
+
+    // Gratificación trunca: meses calendario COMPLETOS del semestre en curso.
+    const inicioGrati = inicioSemestreGrati(input.fechaCese);
+    const desdeGrati =
+      new Date(contrato.fechaInicio).getTime() > inicioGrati.getTime()
+        ? new Date(contrato.fechaInicio)
+        : inicioGrati;
+    const grati = mesesYDias(desdeGrati, input.fechaCese);
+
+    // Vacaciones: períodos con saldo del récord vacacional.
+    const periodos = await tx.vacacionPeriodo.findMany({
+      where: { employeeId: input.employeeId, estado: { in: ['EN_CURSO', 'VENCIDO_PENDIENTE'] } },
+      orderBy: { periodoInicio: 'asc' },
+    });
+
+    // Pendientes: sueldo del mes en curso prorrateado + horas extra no incluidas
+    // en nómina (DIARIAS al 25%, SEMANALES al 35% — simplificación corregible).
+    const pendientes: Array<{ concepto: string; monto: number }> = [];
+    const diaCese = input.fechaCese.getUTCDate();
+    pendientes.push({
+      concepto: `Sueldo ${input.fechaCese.toISOString().slice(0, 7)} (${diaCese} días)`,
+      monto: redondear((remuneracion * Math.min(diaCese, DIAS_POR_MES)) / DIAS_POR_MES),
+    });
+
+    const horasDia = Number((contrato.jornada as any)?.horasDia ?? 8) || 8;
+    const valorHora = remuneracion / DIAS_POR_MES / horasDia;
+    const horasExtra = await tx.horasExtra.findMany({
+      where: { employeeId: input.employeeId, incluidoEnNomina: false },
+    });
+    let montoHoras = 0;
+    for (const he of horasExtra) {
+      const recargo = he.tipo === 'SEMANALES' ? 1.35 : 1.25;
+      montoHoras += Number(he.horasCalculadas) * valorHora * recargo;
+    }
+    if (montoHoras > 0) {
+      pendientes.push({
+        concepto: 'Horas extra pendientes de nómina',
+        monto: redondear(montoHoras),
+      });
+    }
+
+    // 5ta: renta pagada en el año desde las planillas procesadas del ejercicio.
+    const anio = input.fechaCese.getUTCFullYear();
+    const detalles = await tx.planillaDetalle.findMany({
+      where: {
+        employeeId: input.employeeId,
+        planilla: { periodo: { startsWith: `${anio}-` }, estado: { in: ['procesado', 'cerrado'] } },
+      },
+      include: { planilla: true },
+    });
+    let rentaPagada = 0;
+    let retenciones5ta = 0;
+    for (const detalle of detalles) {
+      for (const concepto of (detalle.conceptosCalculados as any[]) ?? []) {
+        if (concepto.monto > 0) rentaPagada += concepto.monto;
+        if (concepto.codigo === '0801') retenciones5ta += -concepto.monto;
+      }
+    }
+
+    return {
+      regimen: contrato.regimenLaboral,
+      tipoContrato: contrato.fechaFin ? 'plazo_fijo' : 'indeterminado',
+      fechaInicioContrato: new Date(contrato.fechaInicio).toISOString().slice(0, 10),
+      fechaFinContrato: contrato.fechaFin
+        ? new Date(contrato.fechaFin).toISOString().slice(0, 10)
+        : null,
+      remuneracionComputable: remuneracion,
+      sistemaPensionario: regimenPensionario?.sistema === 'afp' ? 'afp' : 'onp',
+      afiliadoEps: false,
+      excluidoIndemnizacionVacacional: false,
+      cts: {
+        gratificacionSemestralPercibida: remuneracion, // aprox. 1 sueldo; corregible
+        mesesCompletosDesdeUltimoDeposito: cts.meses,
+        diasAdicionales: cts.dias,
+      },
+      gratificacionTrunca: { mesesCompletos: grati.meses },
+      vacaciones: periodos.map((p: any) => ({
+        periodoInicio: new Date(p.periodoInicio),
+        periodoFin: new Date(p.periodoFin),
+        diasGanados: p.diasGanados,
+        diasGozados: Number(p.diasGozados),
+        estado: p.estado,
+      })),
+      remuneracionesPendientes: pendientes,
+      gratificacionExtraordinaria: 0,
+      derechohabientes: null,
+      quinta: {
+        rentaPagadaEnElAnio: redondear(rentaPagada),
+        retencionesYaEfectuadas: redondear(retenciones5ta),
+      },
+    };
+  }
+
+  protected async obtenerCese(tx: any, ceseId: string): Promise<any> {
+    const cese = await tx.cese.findUnique({ where: { id: ceseId } });
+    if (!cese) throw new NotFoundException(`Cese ${ceseId} no encontrado`);
+    return cese;
+  }
+}
