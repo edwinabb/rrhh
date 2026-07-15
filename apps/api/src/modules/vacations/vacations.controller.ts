@@ -16,6 +16,17 @@ export class ActualizarPeriodoDto {
   notas?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Validación manual (proyecto no usa class-validator)
+// ---------------------------------------------------------------------------
+
+const ESTADOS_PERIODO: readonly (
+  | 'EN_CURSO'
+  | 'VENCIDO_PENDIENTE'
+  | 'GOZADO'
+  | 'LIQUIDADO'
+)[] = ['EN_CURSO', 'VENCIDO_PENDIENTE', 'GOZADO', 'LIQUIDADO'];
+
 @Controller('vacaciones')
 @UseGuards(PermissionsGuard)
 export class VacationsController {
@@ -51,6 +62,16 @@ export class VacationsController {
   @Put('periodos/:id')
   @RequirePermission('vacation.manage')
   async actualizar(@Param('id') id: string, @Body() dto: ActualizarPeriodoDto) {
+    if (dto?.estado !== undefined && !ESTADOS_PERIODO.includes(dto.estado)) {
+      throw new BadRequestException(
+        `estado inválido: "${dto.estado}" (válidos: ${ESTADOS_PERIODO.join(', ')})`,
+      );
+    }
+    if (dto?.diasGozados !== undefined) {
+      if (typeof dto.diasGozados !== 'number' || !Number.isFinite(dto.diasGozados)) {
+        throw new BadRequestException('diasGozados debe ser un número finito');
+      }
+    }
     const ctx = getTenantContext();
     return this.vacations.actualizarPeriodo(ctx.tx, id, dto ?? {});
   }
