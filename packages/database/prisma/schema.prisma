@@ -35,6 +35,8 @@ model Tenant {
 
   // Fase 1 — Nómina
   planillaNovedades PlanillaNovedad[]
+  ceses             Cese[]
+  vacacionPeriodos  VacacionPeriodo[]
 
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
@@ -175,7 +177,8 @@ model Employee {
   regimenesPensionarios RegimenPensionario[]
   planillaDetalles      PlanillaDetalle[]
   planillaNovedades     PlanillaNovedad[]
-  liquidacion           Liquidacion?
+  ceses                 Cese[]
+  vacacionPeriodos      VacacionPeriodo[]
 
   // Fase 2 — Asistencia
   marcaciones         Marcacion[]
@@ -202,7 +205,7 @@ model Employee {
 model Contrato {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   employeeId          String    @map("employee_id") @db.Uuid
-  regimenLaboral      String    @map("regimen_laboral") @db.VarChar(20) // general | mype | agrario
+  regimenLaboral      String    @map("regimen_laboral") @db.VarChar(20) // general | mype_micro | mype_pequena | agrario
   regimenLaboralSunat String    @map("regimen_laboral_sunat") @db.VarChar(2) // codigo Tabla 33
   tipoTrabajadorSunat String    @map("tipo_trabajador_sunat") @db.VarChar(2) // codigo Tabla 8
   tipoContrato        String    @map("tipo_contrato") @db.VarChar(30)
@@ -328,16 +331,95 @@ model PlanillaNovedad {
   @@map("planilla_novedad")
 }
 
-model Liquidacion {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  employeeId   String   @unique @map("employee_id") @db.Uuid
-  fechaCese    DateTime @map("fecha_cese") @db.Date
-  componentes  Json // cts_trunca, grati_trunca, vacaciones_truncas
-  generadoAt   DateTime @default(now()) @map("generado_at")
+// ---------------------------------------------------------------------------
+// Cese y liquidación de beneficios sociales (D.S. 001-97-TR: pago en 48h).
+// Ver docs/superpowers/specs/2026-07-15-liquidacion-cese-design.md.
+// ---------------------------------------------------------------------------
 
+enum MotivoCese {
+  RENUNCIA
+  TERMINO_CONTRATO
+  MUTUO_DISENSO
+  DESPIDO_ARBITRARIO
+  FALLECIMIENTO
+
+  @@map("motivo_cese")
+}
+
+enum EstadoCese {
+  BORRADOR
+  CALCULADA
+  APROBADA
+  PAGADA
+  ANULADA
+
+  @@map("estado_cese")
+}
+
+model Cese {
+  id         String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String     @map("tenant_id") @db.Uuid
+  employeeId String     @map("employee_id") @db.Uuid
+  fechaCese  DateTime   @map("fecha_cese") @db.Date
+  motivo     MotivoCese
+  estado     EstadoCese @default(BORRADOR)
+
+  inputSnapshot Json  @map("input_snapshot")
+  componentes   Json?
+  totalBruto       Decimal? @map("total_bruto") @db.Decimal(12, 2)
+  totalDeducciones Decimal? @map("total_deducciones") @db.Decimal(12, 2)
+  netoPagar        Decimal? @map("neto_pagar") @db.Decimal(12, 2)
+
+  gratificacionExtraordinaria Decimal @default(0) @map("gratificacion_extraordinaria") @db.Decimal(12, 2)
+  derechohabientes            Json?
+
+  fechaLimitePago  DateTime  @map("fecha_limite_pago") @db.Date
+  aprobadoPor      String?   @map("aprobado_por") @db.Uuid
+  aprobadoEn       DateTime? @map("aprobado_en")
+  pagadoEn         DateTime? @map("pagado_en")
+  pagoFueraDePlazo Boolean   @default(false) @map("pago_fuera_de_plazo")
+  motivoAnulacion  String?   @map("motivo_anulacion") @db.Text
+
+  creadoPor     String   @map("creado_por") @db.Uuid
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   employee Employee @relation(fields: [employeeId], references: [id])
 
-  @@map("liquidacion")
+  @@index([tenantId, estado])
+  @@index([tenantId, employeeId])
+  @@map("cese")
+}
+
+enum EstadoVacacionPeriodo {
+  EN_CURSO
+  VENCIDO_PENDIENTE
+  GOZADO
+  LIQUIDADO
+
+  @@map("estado_vacacion_periodo")
+}
+
+model VacacionPeriodo {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  employeeId    String   @map("employee_id") @db.Uuid
+  periodoInicio DateTime @map("periodo_inicio") @db.Date
+  periodoFin    DateTime @map("periodo_fin") @db.Date
+  diasGanados   Int      @map("dias_ganados")
+  diasGozados   Decimal  @default(0) @map("dias_gozados") @db.Decimal(5, 2)
+  estado        EstadoVacacionPeriodo @default(EN_CURSO)
+  notas         String?  @db.Text
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId, periodoInicio])
+  @@index([tenantId, estado])
+  @@map("vacacion_periodo")
 }
 
 // ---------------------------------------------------------------------------
@@ -632,6 +714,12 @@ enum TipoDocumento {
   CERTIFICADO
   MEMO
   BOLETA
+  LIQUIDACION
+  CERTIFICADO_TRABAJO
+  CONSTANCIA_CESE
+  CERTIFICADO_RETENCION_5TA
+  CARTA_RENUNCIA
+  EXAMEN_MEDICO_RETIRO
   OTRO
 
   @@map("tipo_documento")
