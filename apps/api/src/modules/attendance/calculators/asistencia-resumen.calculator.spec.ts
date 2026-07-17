@@ -99,6 +99,17 @@ describe('construirResumenDia', () => {
     expect(resumen.tardanzaMinutos).toBe(0);
   });
 
+  it('llegar exactamente al minuto de tolerancia ya es tardanza (>=)', () => {
+    const resumen = construirResumenDia(
+      [
+        { tipo: 'ENTRADA', timestampActual: new Date(2026, 6, 20, 8, 30) }, // tolerancia 30 sobre 08:00
+        { tipo: 'SALIDA', timestampActual: new Date(2026, 6, 20, 17, 0) },
+      ],
+      { horaInicioDia: '08:00', minutosToleranciaEntrada: 30, horasJornada: 8 },
+    );
+    expect(resumen.tardanzaMinutos).toBe(30);
+  });
+
   it('día inconsistente: entrada sin salida → horasTrabajadas 0 y flag inconsistente', () => {
     const marcaciones: MarcacionDia[] = [
       marcacion('ENTRADA', '2026-07-13T08:00:00'),
