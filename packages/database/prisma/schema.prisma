@@ -37,6 +37,9 @@ model Tenant {
   planillaNovedades PlanillaNovedad[]
   ceses             Cese[]
   vacacionPeriodos  VacacionPeriodo[]
+  turnos                   Turno[]
+  turnoAsignaciones        TurnoAsignacion[]
+  compensatorioMovimientos CompensatorioMovimiento[]
 
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
@@ -179,6 +182,8 @@ model Employee {
   planillaNovedades     PlanillaNovedad[]
   ceses                 Cese[]
   vacacionPeriodos      VacacionPeriodo[]
+  turnoAsignaciones        TurnoAsignacion[]
+  compensatorioMovimientos CompensatorioMovimiento[]
 
   // Fase 2 — Asistencia
   marcaciones         Marcacion[]
@@ -214,6 +219,10 @@ model Contrato {
   fechaFin            DateTime? @map("fecha_fin") @db.Date // null = indeterminado
   jornada             Json // horas/dias pactados
   remuneracionBasica   Decimal  @map("remuneracion_basica") @db.Decimal(10, 2)
+
+  // Personal de dirección/confianza (D.S. 007-2002-TR): la empresa puede
+  // convocarlo en cualquier horario; sin horas extra a nómina (spec §4.5).
+  personalDeConfianza Boolean @default(false) @map("personal_de_confianza")
 
   employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
@@ -666,6 +675,13 @@ model AsistenciaResumen {
   tardanzaMinutos Int     @default(0) @map("tardanza_minutos")
   justificado     Boolean @default(false)
 
+  // Control por turnos (null/0/false para personal con horario estándar)
+  turnoId         String?   @map("turno_id") @db.Uuid
+  minutosRetraso  Int       @default(0) @map("minutos_retraso")
+  salidaEsperada  DateTime? @map("salida_esperada")
+  deficitMinutos  Int       @default(0) @map("deficit_minutos")
+  sinPlan         Boolean   @default(false) @map("sin_plan")
+
   actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -685,6 +701,10 @@ model ConfiguracionAsistencia {
   horaSalidaEstandar        String @default("17:00") @map("hora_salida_estandar") @db.VarChar(5) // HH:mm
   toleranciaTardanzaMinutos Int    @default(15) @map("tolerancia_tardanza_minutos")
 
+  // Ventana de captura de marcaciones alrededor del turno asignado (spec §4.1)
+  ventanaAntesTurnoMinutos   Int @default(120) @map("ventana_antes_turno_minutos")
+  ventanaDespuesTurnoMinutos Int @default(240) @map("ventana_despues_turno_minutos")
+
   requiereGeofence  Boolean @default(true) @map("requiere_geofence")
   requiereBiometria Boolean @default(false) @map("requiere_biometria")
   umbralConfianzaBiometria Float @default(0.95) @map("umbral_confianza_biometria") // score mínimo aceptado: 0.0 a 1.0
@@ -695,6 +715,89 @@ model ConfiguracionAsistencia {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("configuracion_asistencia")
+}
+
+// ---------------------------------------------------------------------------
+// Control de asistencia por turnos.
+// Ver docs/superpowers/specs/2026-07-17-turnos-asistencia-design.md.
+// ---------------------------------------------------------------------------
+
+model Turno {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String  @map("tenant_id") @db.Uuid
+  codigo            String  @db.VarChar(20)
+  nombre            String  @db.VarChar(80)
+  horaInicio        String  @map("hora_inicio") @db.VarChar(5) // HH:mm
+  horaFin           String  @map("hora_fin") @db.VarChar(5) // HH:mm; <= horaInicio => cruza medianoche
+  horasEsperadas    Decimal @map("horas_esperadas") @db.Decimal(4, 2)
+  toleranciaMinutos Int     @default(30) @map("tolerancia_minutos")
+  activo            Boolean @default(true)
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  asignaciones TurnoAsignacion[]
+
+  @@unique([tenantId, codigo])
+  @@map("turno")
+}
+
+enum TipoDiaPlan {
+  TURNO
+  DESCANSO
+  DESCANSO_COMPENSATORIO
+
+  @@map("tipo_dia_plan")
+}
+
+model TurnoAsignacion {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String      @map("tenant_id") @db.Uuid
+  employeeId String      @map("employee_id") @db.Uuid
+  fecha      DateTime    @db.Date
+  tipoDia    TipoDiaPlan @map("tipo_dia")
+  turnoId    String?     @map("turno_id") @db.Uuid // obligatorio si tipoDia = TURNO
+  notas      String?     @db.Text
+
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  turno    Turno?   @relation(fields: [turnoId], references: [id])
+
+  @@unique([tenantId, employeeId, fecha])
+  @@index([tenantId, fecha])
+  @@map("turno_asignacion")
+}
+
+enum TipoMovimientoCompensatorio {
+  GANADO
+  GOZADO
+  AJUSTE_INICIAL
+
+  @@map("tipo_movimiento_compensatorio")
+}
+
+// Libro mayor de descansos compensatorios: append-only, saldo = suma de dias.
+model CompensatorioMovimiento {
+  id                String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String                      @map("tenant_id") @db.Uuid
+  employeeId        String                      @map("employee_id") @db.Uuid
+  tipo              TipoMovimientoCompensatorio
+  dias              Decimal                     @db.Decimal(4, 2) // GANADO > 0, GOZADO < 0 (reversión > 0), AJUSTE_INICIAL ±n
+  fechaReferencia   DateTime                    @map("fecha_referencia") @db.Date
+  turnoAsignacionId String?                     @map("turno_asignacion_id") @db.Uuid
+  motivo            String?                     @db.Text // obligatorio en AJUSTE_INICIAL
+  creadoPor         String                      @map("creado_por") @db.Uuid
+  creadoEn          DateTime                    @default(now()) @map("creado_en")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeId])
+  @@map("compensatorio_movimiento")
 }
 
 // ---------------------------------------------------------------------------
