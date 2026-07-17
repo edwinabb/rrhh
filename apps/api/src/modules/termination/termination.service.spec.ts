@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { TerminationService, calcularFechaLimitePago } from './termination.service';
 
 const CONTRATO = {
@@ -200,5 +204,100 @@ describe('TerminationService — calcular', () => {
     tx.cese.findUnique.mockResolvedValue({ id: 'cese-1', estado: 'APROBADA', inputSnapshot: SNAPSHOT });
     const service = new TerminationService({ resolve: jest.fn(paramsResolve) } as any);
     await expect(service.calcular(tx, 'cese-1')).rejects.toThrow(ConflictException);
+  });
+});
+
+describe('TerminationService — aprobar/pagar/anular', () => {
+  const ceseCalculada = (overrides: any = {}) => ({
+    id: 'cese-1',
+    tenantId: 't-1',
+    employeeId: 'emp-1',
+    estado: 'CALCULADA',
+    motivo: 'RENUNCIA',
+    fechaCese: new Date('2026-07-15'),
+    fechaLimitePago: new Date('2026-07-17'),
+    componentes: { ingresos: [], deducciones: [] },
+    derechohabientes: null,
+    inputSnapshot: {},
+    ...overrides,
+  });
+
+  const documentos = { generarDocumentosCese: jest.fn().mockResolvedValue(['d1', 'd2', 'd3', 'd4']) } as any;
+
+  function crearService() {
+    return new TerminationService({ resolve: jest.fn() } as any, documentos);
+  }
+
+  it('aprobar: genera documentos, cesa al empleado y liquida los períodos vacacionales', async () => {
+    const tx = mockTx();
+    tx.cese.findUnique.mockResolvedValue(ceseCalculada());
+    tx.tenant = { findUnique: jest.fn().mockResolvedValue({ razonSocial: 'Demo SAC', ruc: '20123456789' }) };
+    const service = crearService();
+    await service.aprobar(tx, 'cese-1', 'admin-1');
+
+    expect(documentos.generarDocumentosCese).toHaveBeenCalled();
+    expect(tx.employee.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'cesado' } }),
+    );
+    expect(tx.vacacionPeriodo.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'LIQUIDADO' } }),
+    );
+    expect(tx.cese.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ estado: 'APROBADA', aprobadoPor: 'admin-1' }) }),
+    );
+  });
+
+  it('aprobar: FALLECIMIENTO sin derechohabientes → 422', async () => {
+    const tx = mockTx();
+    tx.cese.findUnique.mockResolvedValue(ceseCalculada({ motivo: 'FALLECIMIENTO' }));
+    await expect(crearService().aprobar(tx, 'cese-1', 'admin-1')).rejects.toThrow(
+      UnprocessableEntityException,
+    );
+  });
+
+  it('aprobar: derechohabientes con porcentajes que no suman 100 → 422', async () => {
+    const tx = mockTx();
+    tx.cese.findUnique.mockResolvedValue(
+      ceseCalculada({
+        motivo: 'FALLECIMIENTO',
+        derechohabientes: [{ nombre: 'X', tipoDocumento: '01', numeroDocumento: '1', parentesco: 'cónyuge', porcentaje: 60 }],
+      }),
+    );
+    await expect(crearService().aprobar(tx, 'cese-1', 'admin-1')).rejects.toThrow(
+      UnprocessableEntityException,
+    );
+  });
+
+  it('aprobar: si la generación de PDFs falla, el estado NO avanza', async () => {
+    const tx = mockTx();
+    tx.cese.findUnique.mockResolvedValue(ceseCalculada());
+    tx.tenant = { findUnique: jest.fn().mockResolvedValue({ razonSocial: 'Demo SAC', ruc: '20123456789' }) };
+    documentos.generarDocumentosCese.mockRejectedValueOnce(new Error('MinIO caído'));
+    await expect(crearService().aprobar(tx, 'cese-1', 'admin-1')).rejects.toThrow('MinIO caído');
+    expect(tx.cese.update).not.toHaveBeenCalled();
+  });
+
+  it('pagar: fuera del plazo de 48h marca pagoFueraDePlazo', async () => {
+    const tx = mockTx();
+    tx.cese.findUnique.mockResolvedValue(ceseCalculada({ estado: 'APROBADA' }));
+    const service = crearService();
+    await service.pagar(tx, 'cese-1', new Date('2026-07-20T12:00:00Z'));
+    expect(tx.cese.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ estado: 'PAGADA', pagoFueraDePlazo: true }),
+      }),
+    );
+  });
+
+  it('anular: desde APROBADA revierte empleado y vacaciones; desde PAGADA se rechaza', async () => {
+    const tx = mockTx();
+    tx.cese.findUnique.mockResolvedValue(ceseCalculada({ estado: 'APROBADA' }));
+    await crearService().anular(tx, 'cese-1', 'error de datos');
+    expect(tx.employee.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { estado: 'activo' } }),
+    );
+
+    tx.cese.findUnique.mockResolvedValue(ceseCalculada({ estado: 'PAGADA' }));
+    await expect(crearService().anular(tx, 'cese-1', 'x')).rejects.toThrow(ConflictException);
   });
 });

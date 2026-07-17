@@ -3,8 +3,10 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { NormativeParameterService } from '../normative-params/normative-parameter.service';
+import { CeseDocumentsService } from './cese-documents.service';
 import { PeriodoVacacionalInput } from '../payroll/calculators/vacaciones.calculator';
 import { RegimenLaboral } from '../payroll/calculators/indemnizacion-despido.calculator';
 import { calcularLiquidacion, MotivoCese } from '../payroll/calculators/liquidacion.calculator';
@@ -93,7 +95,104 @@ function redondear(monto: number): number {
 
 @Injectable()
 export class TerminationService {
-  constructor(private readonly normativeParams: NormativeParameterService) {}
+  constructor(
+    private readonly normativeParams: NormativeParameterService,
+    private readonly ceseDocuments?: CeseDocumentsService,
+  ) {}
+
+  async listar(tx: any): Promise<any[]> {
+    return tx.cese.findMany({
+      orderBy: { creadoEn: 'desc' },
+      include: { employee: { select: { nombres: true, apellidos: true, numeroDocumento: true } } },
+    });
+  }
+
+  async detalle(tx: any, ceseId: string): Promise<any> {
+    const cese = await tx.cese.findUnique({
+      where: { id: ceseId },
+      include: { employee: { select: { nombres: true, apellidos: true, numeroDocumento: true } } },
+    });
+    if (!cese) throw new NotFoundException(`Cese ${ceseId} no encontrado`);
+    return cese;
+  }
+
+  async aprobar(tx: any, ceseId: string, aprobadoPor: string): Promise<any> {
+    const cese = await this.obtenerCese(tx, ceseId);
+    if (cese.estado !== 'CALCULADA') {
+      throw new ConflictException(`Solo se aprueba una liquidación CALCULADA (actual: ${cese.estado})`);
+    }
+
+    // Validaciones de completitud por motivo (422 con lista de faltantes).
+    const faltantes: string[] = [];
+    if (cese.motivo === 'FALLECIMIENTO') {
+      const derechohabientes = cese.derechohabientes ?? [];
+      if (derechohabientes.length === 0) {
+        faltantes.push('derechohabientes: obligatorios en cese por fallecimiento');
+      } else {
+        const suma = derechohabientes.reduce((s: number, d: any) => s + Number(d.porcentaje), 0);
+        if (Math.abs(suma - 100) > 0.01) {
+          faltantes.push(`derechohabientes: los porcentajes suman ${suma}, deben sumar 100`);
+        }
+      }
+    }
+    if (!cese.componentes) faltantes.push('componentes: la liquidación no está calculada');
+    if (faltantes.length > 0) {
+      throw new UnprocessableEntityException({ message: 'Cese incompleto', faltantes });
+    }
+
+    const empleado = await tx.employee.findUnique({ where: { id: cese.employeeId } });
+    const tenant = await tx.tenant.findUnique({ where: { id: cese.tenantId } });
+
+    // Documentos PRIMERO: si MinIO falla, el estado no avanza (reintento seguro;
+    // re-subir crea versiones nuevas, no duplica documentos).
+    await this.ceseDocuments!.generarDocumentosCese(tx, cese, empleado, tenant, aprobadoPor);
+
+    await tx.employee.update({ where: { id: cese.employeeId }, data: { estado: 'cesado' } });
+    await tx.vacacionPeriodo.updateMany({
+      where: { employeeId: cese.employeeId, estado: { in: ['EN_CURSO', 'VENCIDO_PENDIENTE'] } },
+      data: { estado: 'LIQUIDADO' },
+    });
+
+    return tx.cese.update({
+      where: { id: ceseId },
+      data: { estado: 'APROBADA', aprobadoPor, aprobadoEn: new Date() },
+    });
+  }
+
+  async pagar(tx: any, ceseId: string, fechaPago: Date = new Date()): Promise<any> {
+    const cese = await this.obtenerCese(tx, ceseId);
+    if (cese.estado !== 'APROBADA') {
+      throw new ConflictException(`Solo se paga una liquidación APROBADA (actual: ${cese.estado})`);
+    }
+    const fueraDePlazo = fechaPago.getTime() > new Date(cese.fechaLimitePago).getTime() + 86_399_999;
+    return tx.cese.update({
+      where: { id: ceseId },
+      data: { estado: 'PAGADA', pagadoEn: fechaPago, pagoFueraDePlazo: fueraDePlazo },
+    });
+  }
+
+  async anular(tx: any, ceseId: string, motivo: string): Promise<any> {
+    if (!motivo || motivo.trim() === '') {
+      throw new BadRequestException('El motivo de anulación es obligatorio');
+    }
+    const cese = await this.obtenerCese(tx, ceseId);
+    if (cese.estado === 'PAGADA' || cese.estado === 'ANULADA') {
+      throw new ConflictException(`Un cese ${cese.estado} no puede anularse`);
+    }
+    if (cese.estado === 'APROBADA') {
+      // Aproximación conservadora: los períodos vuelven a VENCIDO_PENDIENTE;
+      // RRHH corrige el estado real por período con PUT /vacaciones/periodos/:id.
+      await tx.employee.update({ where: { id: cese.employeeId }, data: { estado: 'activo' } });
+      await tx.vacacionPeriodo.updateMany({
+        where: { employeeId: cese.employeeId, estado: 'LIQUIDADO' },
+        data: { estado: 'VENCIDO_PENDIENTE' },
+      });
+    }
+    return tx.cese.update({
+      where: { id: ceseId },
+      data: { estado: 'ANULADA', motivoAnulacion: motivo.trim() },
+    });
+  }
 
   async crearCese(tx: any, input: CrearCeseInput): Promise<any> {
     const empleado = await tx.employee.findUnique({ where: { id: input.employeeId } });
