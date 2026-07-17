@@ -20,6 +20,7 @@
 - NUNCA ejecutar `next build` con el dev server de la web corriendo (comparten `.next`).
 - Comentarios y nombres de dominio en español; commits en español con prefijo convencional.
 - Gracia de puntualidad: `toleranciaMinutos = 30` significa "hasta 29:59 no es tarde; a los 30:00 exactos ya es tarde" (comparación `>=` sobre minutos enteros).
+- Personal de confianza (`Contrato.personalDeConfianza = true`): NUNCA genera `HorasExtra` hacia nómina; el exceso sobre `JORNADA_SEMANAL_MAXIMA` (48 h/semana, parámetro normativo) es solo una nota informativa en el reporte de cumplimiento.
 
 ## File Structure
 
@@ -73,6 +74,14 @@ docs/RESUMEN_SISTEMA.md, docs/PENDIENTES.md                              (modifi
   salidaEsperada  DateTime? @map("salida_esperada")
   deficitMinutos  Int       @default(0) @map("deficit_minutos")
   sinPlan         Boolean   @default(false) @map("sin_plan")
+```
+
+1b. En `Contrato`, después de `jornada`:
+
+```prisma
+  // Personal de dirección/confianza (D.S. 007-2002-TR): la empresa puede
+  // convocarlo en cualquier horario; sin horas extra a nómina (spec §4.5).
+  personalDeConfianza Boolean @default(false) @map("personal_de_confianza")
 ```
 
 2. En `ConfiguracionAsistencia`, después de `toleranciaTardanzaMinutos`:
@@ -195,6 +204,9 @@ Crear `packages/database/prisma/migrations/20260718000000_turnos_asistencia/migr
 -- Patrón RLS/GRANT/auditoría de 20260715000000_cese_liquidacion.
 
 -- 1. Campos nuevos en tablas existentes
+ALTER TABLE "contrato"
+  ADD COLUMN "personal_de_confianza" BOOLEAN NOT NULL DEFAULT false;
+
 ALTER TABLE "asistencia_resumen"
   ADD COLUMN "turno_id" UUID,
   ADD COLUMN "minutos_retraso" INTEGER NOT NULL DEFAULT 0,
@@ -339,16 +351,26 @@ git commit -m "feat(turnos): schema y migración de catálogo, plan, compensator
 - Manager: `shift.read`.
 - Employee: sin cambios (consulta su plan vía endpoint de sesión, sin permiso).
 
-- [ ] **Step 3: Ejecutar el seed (idempotente)**
+- [ ] **Step 3: Agregar el parámetro normativo a `NORMATIVE_PARAMETERS_SEED`** (con el sufijo estándar):
+
+```typescript
+  {
+    codigo: 'JORNADA_SEMANAL_MAXIMA',
+    valor: 48,
+    descripcion: 'Horas máximas de jornada semanal (D.Leg. 854) — valor de referencia sin confirmar',
+  },
+```
+
+- [ ] **Step 4: Ejecutar el seed (idempotente)**
 
 Run: `cd packages/database && pnpm run seed`
 Expected: termina sin errores; re-ejecutar no duplica filas.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add packages/database/seed.ts
-git commit -m "feat(turnos): permisos shift.read/manage/resolve"
+git commit -m "feat(turnos): permisos shift.* y parámetro de jornada semanal máxima"
 ```
 
 ---
@@ -870,6 +892,7 @@ function mockTx(overrides: any = {}) {
     justificacion: { findFirst: jest.fn().mockResolvedValue(null) },
     asistenciaResumen: { upsert: jest.fn() },
     horasExtra: { upsert: jest.fn() },
+    contrato: { findFirst: jest.fn().mockResolvedValue({ personalDeConfianza: false }) },
     ...overrides,
   };
 }
@@ -925,6 +948,26 @@ describe('TurnoRecalculoService', () => {
     const upsertHe = tx.horasExtra.upsert.mock.calls[0][0];
     expect(upsertHe.where.tenantId_employeeId_fecha_tipo.fecha).toEqual(new Date(2026, 6, 20));
     expect(upsertHe.create.horasCalculadas).toBeCloseTo(1, 2);
+  });
+
+  it('personal de confianza: horasExtrasDiarias=0 y NO se upserta HorasExtra', async () => {
+    const tx = mockTx();
+    tx.contrato.findFirst.mockResolvedValue({ personalDeConfianza: true });
+    tx.turnoAsignacion.count.mockResolvedValue(10);
+    tx.turnoAsignacion.findMany.mockResolvedValue([
+      { fecha: new Date(2026, 6, 20), tipoDia: 'TURNO', turno: TURNO_NOCHE },
+    ]);
+    tx.marcacion.findMany.mockResolvedValue([
+      { tipo: 'ENTRADA', timestamp: new Date(2026, 6, 20, 20, 0) },
+      { tipo: 'SALIDA', timestamp: new Date(2026, 6, 21, 9, 0) }, // 1h sobre el turno
+    ]);
+
+    await service.recalcularConTurno(tx, 't-1', 'emp-1', new Date(2026, 6, 21, 9, 0), CONFIG);
+
+    const upsert = tx.asistenciaResumen.upsert.mock.calls[0][0];
+    expect(upsert.update.horasExtrasDiarias).toBe(0);
+    expect(upsert.update.horasTrabajadas).toBeCloseTo(13, 2); // horas reales sí quedan
+    expect(tx.horasExtra.upsert).not.toHaveBeenCalled();
   });
 
   it('marcación fuera de toda ventana con plan en el mes → resumen del día calendario con sinPlan=true', async () => {
@@ -1068,11 +1111,19 @@ export class TurnoRecalculoService {
       justificacionAprobada: justificacionAprobada ? { id: justificacionAprobada.id } : undefined,
     });
 
+    // Personal de confianza (D.S. 007-2002-TR, spec §4.5): sin horas extra a
+    // nómina; el exceso semanal se informa solo en el reporte de cumplimiento.
+    const contrato = await tx.contrato.findFirst({
+      where: { employeeId },
+      orderBy: { fechaInicio: 'desc' },
+    });
+    const esConfianza = contrato?.personalDeConfianza === true;
+
     const datos = {
       horaEntrada: r.horaEntrada,
       horaSalida: r.horaSalida,
       horasTrabajadas: r.horasTrabajadas,
-      horasExtrasDiarias: r.horasExtras,
+      horasExtrasDiarias: esConfianza ? 0 : r.horasExtras,
       falta: r.falta,
       tardanzaMinutos: r.tardanzaMinutos,
       justificado: r.justificado,
@@ -1089,7 +1140,7 @@ export class TurnoRecalculoService {
       create: { tenantId, employeeId, fecha: fechaTurno, ...datos },
     });
 
-    if (r.horasExtras > 0) {
+    if (!esConfianza && r.horasExtras > 0) {
       await tx.horasExtra.upsert({
         where: {
           tenantId_employeeId_fecha_tipo: {
@@ -1166,7 +1217,7 @@ export class TurnoRecalculoService {
 - [ ] **Step 4: Verificar que pasa**
 
 Run: `pnpm --filter @rrhh/api test -- turno-recalculo`
-Expected: PASS (4 tests)
+Expected: PASS (5 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -2072,7 +2123,7 @@ git commit -m "feat(turnos): import CSV del plan, libro de compensatorios e inte
 - Test: `apps/api/src/modules/shifts/shift-compliance.service.spec.ts`
 
 **Interfaces:**
-- Produces: `generarReporte(tx, periodo: string): Promise<ReporteCumplimiento>` y `exportarNovedadesCsv(tx, periodo: string): Promise<string>`. `ReporteCumplimiento = { periodo, empleados: ReporteEmpleado[] }` con `ReporteEmpleado = { employeeId, nombres, apellidos, numeroDocumento, diasPlanificados, diasTrabajados, faltas, faltasJustificadas, diasTardanza, minutosTardanza, minutosDeficit, pendientesSinPlan: Array<{fecha, contraparteSugerida}>, compensatorios: { saldoInicial, ganados, gozados, saldoActual } }` — consumido por el controller (Task 11) y el frontend (Task 13).
+- Produces: `generarReporte(tx, periodo: string): Promise<ReporteCumplimiento>` y `exportarNovedadesCsv(tx, periodo: string): Promise<string>`. `ReporteCumplimiento = { periodo, empleados: ReporteEmpleado[] }` con `ReporteEmpleado = { employeeId, nombres, apellidos, numeroDocumento, diasPlanificados, diasTrabajados, faltas, faltasJustificadas, diasTardanza, minutosTardanza, minutosDeficit, pendientesSinPlan: Array<{fecha, contraparteSugerida}>, compensatorios: { saldoInicial, ganados, gozados, saldoActual }, alertasConfianza: string[] }` — consumido por el controller (Task 11) y el frontend (Task 13). `alertasConfianza`: solo para personal de confianza, una nota por semana (lunes–domingo) cuyas horas trabajadas excedan `JORNADA_SEMANAL_MAXIMA` (48 por defecto); vacío para el resto.
 
 - [ ] **Step 1: Escribir los tests que fallan**
 
@@ -2089,6 +2140,7 @@ function mockTx(overrides: any = {}) {
     asistenciaResumen: { findMany: jest.fn().mockResolvedValue([]) },
     compensatorioMovimiento: { findMany: jest.fn().mockResolvedValue([]) },
     employee: { findMany: jest.fn().mockResolvedValue([EMPLEADO]) },
+    contrato: { findMany: jest.fn().mockResolvedValue([]) },
     ...overrides,
   };
 }
@@ -2156,6 +2208,30 @@ describe('ShiftComplianceService', () => {
     });
   });
 
+  it('personal de confianza: nota informativa por semana con más de 48 h', async () => {
+    const tx = mockTx();
+    tx.contrato.findMany.mockResolvedValue([
+      { employeeId: 'emp-1', personalDeConfianza: true, fechaInicio: new Date(2024, 0, 1) },
+    ]);
+    tx.turnoAsignacion.findMany.mockResolvedValue([
+      { employeeId: 'emp-1', fecha: new Date(2026, 7, 3), tipoDia: 'TURNO' },
+    ]);
+    // Semana lun 3-ago a dom 9-ago: 4 × 13 h = 52 h > 48
+    tx.asistenciaResumen.findMany.mockResolvedValue(
+      [3, 4, 5, 6].map((dia) => ({
+        employeeId: 'emp-1', fecha: new Date(2026, 7, dia), horasTrabajadas: 13,
+        tardanzaMinutos: 0, deficitMinutos: 0, falta: false, justificado: false, sinPlan: false,
+      })),
+    );
+    const r = await service.generarReporte(tx, '2026-08');
+    expect(r.empleados[0].alertasConfianza).toHaveLength(1);
+    expect(r.empleados[0].alertasConfianza[0]).toContain('52');
+    // Sin flag de confianza no hay alertas
+    tx.contrato.findMany.mockResolvedValue([]);
+    const r2 = await service.generarReporte(tx, '2026-08');
+    expect(r2.empleados[0].alertasConfianza).toHaveLength(0);
+  });
+
   it('exportarNovedadesCsv: header compatible con el import de novedades de nómina', async () => {
     const tx = mockTx();
     tx.turnoAsignacion.findMany.mockResolvedValue([
@@ -2181,6 +2257,7 @@ Expected: FAIL — `Cannot find module './shift-compliance.service'`
 ```typescript
 // apps/api/src/modules/shifts/shift-compliance.service.ts
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { NormativeParameterService } from '../normative-params/normative-parameter.service';
 
 export interface ReporteEmpleado {
   employeeId: string;
@@ -2196,6 +2273,8 @@ export interface ReporteEmpleado {
   minutosDeficit: number;
   pendientesSinPlan: Array<{ fecha: string; contraparteSugerida: string | null }>;
   compensatorios: { saldoInicial: number; ganados: number; gozados: number; saldoActual: number };
+  /** Solo personal de confianza: una nota por semana que exceda las 48 h. */
+  alertasConfianza: string[];
 }
 
 export interface ReporteCumplimiento {
@@ -2205,6 +2284,16 @@ export interface ReporteCumplimiento {
 
 const PERIODO_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CSV_HEADER = 'numero_documento,dias_laborados,horas_extra_25,horas_extra_35,bonificaciones,descuentos';
+const JORNADA_SEMANAL_MAXIMA_DEFAULT = 48;
+
+/** Lunes (00:00) de la semana de la fecha dada. */
+function lunesDe(fecha: Date): Date {
+  const d = new Date(fecha);
+  d.setHours(0, 0, 0, 0);
+  const dia = d.getDay(); // 0 = domingo
+  d.setDate(d.getDate() - (dia === 0 ? 6 : dia - 1));
+  return d;
+}
 
 /**
  * Reporte de cumplimiento del período (spec §7): compara plan vs. resúmenes,
@@ -2215,6 +2304,8 @@ const CSV_HEADER = 'numero_documento,dias_laborados,horas_extra_25,horas_extra_3
  */
 @Injectable()
 export class ShiftComplianceService {
+  constructor(private readonly normativeParams?: NormativeParameterService) {}
+
   async generarReporte(tx: any, periodo: string): Promise<ReporteCumplimiento> {
     if (!PERIODO_REGEX.test(periodo)) {
       throw new BadRequestException(`Período inválido: "${periodo}" (formato YYYY-MM)`);
@@ -2224,12 +2315,20 @@ export class ShiftComplianceService {
     const hasta = new Date(anio, mes, 0, 23, 59, 59, 999);
     const hoy = new Date();
 
-    const [asignaciones, resumenes, movimientos, empleados] = await Promise.all([
+    // Parámetro normativo configurable (48 h por defecto, D.Leg. 854)
+    const jornadaSemanalMaxima = this.normativeParams
+      ? (((await this.normativeParams.resolve(tx, 'JORNADA_SEMANAL_MAXIMA', hasta)) as number) ??
+        JORNADA_SEMANAL_MAXIMA_DEFAULT)
+      : JORNADA_SEMANAL_MAXIMA_DEFAULT;
+
+    const [asignaciones, resumenes, movimientos, empleados, contratos] = await Promise.all([
       tx.turnoAsignacion.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
       tx.asistenciaResumen.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
       tx.compensatorioMovimiento.findMany({}),
       tx.employee.findMany({}),
+      tx.contrato.findMany({ where: { personalDeConfianza: true } }),
     ]);
+    const idsConfianza = new Set<string>(contratos.map((c: any) => c.employeeId));
 
     const empleadosPorId = new Map<string, any>(empleados.map((e: any) => [e.id, e]));
     // Empleados con actividad de turnos en el período (plan, resumen sinPlan o movimientos)
@@ -2304,6 +2403,24 @@ export class ShiftComplianceService {
       const conHoras = resumenesEmp.filter((r: any) => r.horasTrabajadas > 0);
       const conTardanza = resumenesEmp.filter((r: any) => r.tardanzaMinutos > 0);
 
+      // Nota informativa para personal de confianza (spec §4.5): horas por
+      // semana lunes-domingo > JORNADA_SEMANAL_MAXIMA. NO alimenta nómina.
+      const alertasConfianza: string[] = [];
+      if (idsConfianza.has(employeeId)) {
+        const horasPorSemana = new Map<string, number>();
+        for (const r of resumenesEmp) {
+          const semana = lunesDe(new Date(r.fecha)).toISOString().slice(0, 10);
+          horasPorSemana.set(semana, (horasPorSemana.get(semana) ?? 0) + r.horasTrabajadas);
+        }
+        for (const [semana, horas] of horasPorSemana) {
+          if (horas > jornadaSemanalMaxima) {
+            alertasConfianza.push(
+              `Semana del ${semana}: ${Math.round(horas * 100) / 100} h trabajadas (excede las ${jornadaSemanalMaxima} h semanales — informativo, sin efecto en nómina)`,
+            );
+          }
+        }
+      }
+
       reporte.push({
         employeeId,
         nombres: empleado.nombres,
@@ -2318,6 +2435,7 @@ export class ShiftComplianceService {
         minutosDeficit: resumenesEmp.reduce((s: number, r: any) => s + (r.deficitMinutos ?? 0), 0),
         pendientesSinPlan,
         compensatorios: { saldoInicial, ganados, gozados, saldoActual },
+        alertasConfianza,
       });
     }
 
@@ -2338,7 +2456,7 @@ export class ShiftComplianceService {
 - [ ] **Step 4: Verificar que pasa**
 
 Run: `pnpm --filter @rrhh/api test -- shift-compliance`
-Expected: PASS (5 tests)
+Expected: PASS (6 tests)
 
 - [ ] **Step 5: Commit**
 
@@ -2581,9 +2699,10 @@ import { ShiftPlanImportService } from './shift-plan-import.service';
 import { CompensatorioService } from './compensatorio.service';
 import { ShiftComplianceService } from './shift-compliance.service';
 import { AttendanceModule } from '../attendance/attendance.module';
+import { NormativeParamsModule } from '../normative-params/normative-params.module';
 
 @Module({
-  imports: [AttendanceModule],
+  imports: [AttendanceModule, NormativeParamsModule],
   controllers: [ShiftsController],
   providers: [ShiftPlanService, ShiftPlanImportService, CompensatorioService, ShiftComplianceService],
 })
@@ -2661,6 +2780,7 @@ export interface ReporteEmpleado {
   minutosDeficit: number;
   pendientesSinPlan: Array<{ fecha: string; contraparteSugerida: string | null }>;
   compensatorios: { saldoInicial: number; ganados: number; gozados: number; saldoActual: number };
+  alertasConfianza: string[];
 }
 
 export interface Movimiento {
@@ -3162,7 +3282,12 @@ export function CumplimientoTab() {
                     )}
                   </div>
                 ))}
-                {e.pendientesSinPlan.length === 0 && <span className="text-slate-400">—</span>}
+                {e.alertasConfianza.map((a) => (
+                  <div key={a} className="mb-1 rounded bg-sky-50 px-2 py-1 text-xs text-sky-800">{a}</div>
+                ))}
+                {e.pendientesSinPlan.length === 0 && e.alertasConfianza.length === 0 && (
+                  <span className="text-slate-400">—</span>
+                )}
               </td>
             </tr>
           ))}

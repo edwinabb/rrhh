@@ -68,7 +68,11 @@ GRANTs: SELECT/INSERT/UPDATE `app_rrhh`/`app_admin`; SELECT `app_manager` (equip
 
 **Saldo actual = suma de `dias`.** Append-only por diseño (una corrección es un movimiento inverso, nunca un UPDATE del histórico). GRANTs: SELECT/INSERT `app_rrhh`/`app_admin`; SELECT `app_manager`/`app_employee`.
 
-### 3.4 `AsistenciaResumen` (campos nuevos)
+### 3.4 `Contrato.personalDeConfianza` (campo nuevo, configurable)
+
+`Contrato.personalDeConfianza Boolean @default(false)`: marca al personal cuyo contrato indica que la empresa puede solicitarlo en cualquier horario según el trabajo (personal de dirección/confianza, D.S. 007-2002-TR — no sujeto a jornada máxima). Ver efectos en §4.6.
+
+### 3.5 `AsistenciaResumen` (campos nuevos)
 
 | Campo | Tipo | Notas |
 |---|---|---|
@@ -120,7 +124,15 @@ El reporte empareja "A trabajó sin plan" con "B tenía turno ese día y faltó"
 
 Los movimientos de A y de B son independientes; solo el "intercambio" explícito los liga como operación neutra (el saldo nunca se descuadra por resoluciones a medias).
 
-### 4.5 Goce programado
+### 4.5 Personal de confianza (configurable por contrato)
+
+Para empleados con `Contrato.personalDeConfianza = true`:
+
+- **NO se generan registros de `HorasExtra` hacia nómina** (`horasExtrasDiarias = 0` en su resumen), sin importar cuánto excedan el turno. Las horas trabajadas reales sí quedan registradas.
+- En Perú la jornada máxima es de **48 horas semanales** (parámetro normativo `JORNADA_SEMANAL_MAXIMA`, configurable): el reporte de cumplimiento suma sus horas por semana (lunes–domingo) y, si exceden el parámetro, agrega una **nota informativa para RRHH** — no alimenta el cálculo de planillas ni el libro de compensatorios.
+- Puntualidad, compensación del retraso y déficit se siguen reportando igual que para el resto (informativos).
+
+### 4.6 Goce programado
 
 Asignar `DESCANSO_COMPENSATORIO` en el plan (fecha concreta de disfrute) registra `GOZADO −1` vinculado a esa asignación. Si el saldo del empleado es ≤ 0, el sistema advierte y RRHH puede forzar con nota (queda en auditoría y el saldo puede quedar negativo, visible en el reporte). Quitar/cambiar ese día del plan revierte el movimiento (movimiento inverso, no borrado).
 
@@ -154,7 +166,7 @@ Los services reciben `tx` como primer parámetro (patrón del proyecto); sin cla
 
 ## 7. Reporte de cumplimiento (por período)
 
-Por empleado: días planificados vs. trabajados · faltas (justificadas / no) · tardanzas formales (días y minutos acumulados) · déficit no compensado (minutos) · días `sinPlan` pendientes de resolución (con su contraparte sugerida) · compensatorios: saldo inicial del período, ganados, gozados, **saldo actual**. Totales del período y semáforo por empleado.
+Por empleado: días planificados vs. trabajados · faltas (justificadas / no) · tardanzas formales (días y minutos acumulados) · déficit no compensado (minutos) · días `sinPlan` pendientes de resolución (con su contraparte sugerida) · compensatorios: saldo inicial del período, ganados, gozados, **saldo actual** · para personal de confianza: **nota informativa** por cada semana que exceda las 48 h (`JORNADA_SEMANAL_MAXIMA`). Totales del período y semáforo por empleado.
 
 Export CSV con columnas compatibles con `POST /payroll/:periodo/import` (novedades) para que RRHH cargue los descuentos que decida.
 

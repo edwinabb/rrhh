@@ -29,6 +29,14 @@ Este módulo permite **cargar el plan de turnos, compararlo contra las marcacion
 
 **Consecuencias:** el sistema NO descuenta automáticamente. Genera un **reporte mensual** con tardanzas, déficits y faltas por persona, y RRHH decide qué descontar. Lo decidido se exporta en un archivo compatible con la carga de novedades de nómina.
 
+### Personal de confianza (configurable por contrato)
+
+Algunos contratos indican que la empresa puede solicitar al trabajador **en cualquier horario** según el trabajo (personal de dirección/confianza). Para ellos:
+
+- **No se generan horas extra hacia nómina**, sin importar cuánto excedan su turno. Sus horas reales trabajadas sí quedan registradas.
+- Como en el Perú la jornada máxima es de **48 horas semanales** (valor configurable), el reporte mensual muestra una **nota informativa para RRHH** por cada semana en que superen ese límite — es solo una alerta, **no** afecta el cálculo de planillas ni el saldo de compensatorios.
+- Las reglas de puntualidad y compensación se les reportan igual que al resto.
+
 ## 3. El plan de turnos
 
 - **Catálogo de turnos:** RRHH define los turnos una sola vez (código, horario, horas esperadas, tolerancia). Inicialmente: DIA (08:00–20:00, 12 h) y NOCHE (20:00–08:00, 12 h), ambos con tolerancia de 30 minutos.
@@ -85,6 +93,7 @@ Nada del libro se borra ni se edita: una corrección es siempre un movimiento in
 | Libro de movimientos para compensatorios | Un simple contador por empleado | El contador no responde "¿cuándo ganó este día y cuándo lo usó?" — el libro sí, y es inmutable (auditoría). |
 | El "ganado" NO es automático | +1 automático al detectar un 4.º día | Un día sin plan puede ser un intercambio, no un día adicional; confirmarlo evita saldos inflados. |
 | Ventana de captura de −2h/+4h configurable | Fecha calendario fija | Es la única forma de que el turno noche quede completo en un solo día; los márgenes son parámetros, no constantes. |
+| Personal de confianza: exceso semanal >48h como nota informativa | Calcularlo como horas extra pagables | El contrato de confianza permite convocarlo en cualquier horario; la ley no le aplica jornada máxima. La nota da visibilidad a RRHH sin afectar planillas ni compensatorios. |
 
 ## 9. Qué verá cada rol
 
@@ -125,6 +134,14 @@ This module allows HR to **upload the shift roster, compare it against the time-
 | **Overtime** | Only time worked AFTER the expected departure time (shift end + make-up minutes) counts as overtime. Staying late to make up a late arrival is not overtime. |
 
 **Consequences:** the system does NOT deduct automatically. It generates a **monthly report** with tardiness, deficits, and absences per person, and HR decides what to deduct. Decisions are exported in a file compatible with the payroll variable-input upload.
+
+### Trust/management personnel (configurable per contract)
+
+Some contracts state that the company may call the employee **at any time** depending on the work (management/trust personnel). For them:
+
+- **No overtime records are generated for payroll**, no matter how far they exceed their shift. Their actual hours worked are still recorded.
+- Since Peru's legal maximum working week is **48 hours** (configurable value), the monthly report shows an **informational note for HR** for each week in which they exceed that limit — it is an alert only and does **not** affect payroll calculation or the compensatory-day balance.
+- Punctuality and make-up rules are reported for them the same as for everyone else.
 
 ## 3. The shift roster
 
@@ -182,6 +199,7 @@ Nothing in the ledger is deleted or edited: a correction is always a reversing e
 | Movement ledger for compensatory days | A simple counter per employee | A counter cannot answer "when was this day earned and when was it used?" — the ledger can, and it is immutable (audit). |
 | "Earned" is NOT automatic | Automatic +1 upon detecting a 4th day | An unscheduled day may be a swap, not an additional day; requiring confirmation prevents inflated balances. |
 | Configurable −2h/+4h capture window | Fixed calendar date | It is the only way for the night shift to land complete on a single day; the margins are parameters, not constants. |
+| Trust personnel: weekly excess over 48h as an informational note | Computing it as payable overtime | The trust contract allows calling them at any schedule; the legal maximum working hours do not apply to them. The note gives HR visibility without affecting payroll or compensatory days. |
 
 ## 9. What each role sees
 
