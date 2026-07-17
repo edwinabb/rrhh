@@ -117,7 +117,9 @@ export function construirResumenDia(
     const limiteTolerancia = new Date(
       inicioOficial.getTime() + configuracion.minutosToleranciaEntrada * MS_POR_MINUTO,
     );
-    if (horaEntrada.getTime() > limiteTolerancia.getTime()) {
+    // >=: llegar exactamente al minuto de tolerancia ya es tarde (la gracia
+    // es de tolerancia − 1 seg, ej. 29:59 con tolerancia 30). Spec turnos §1.
+    if (horaEntrada.getTime() >= limiteTolerancia.getTime()) {
       // Superada la gracia, el retraso se mide contra la hora oficial de inicio
       tardanzaMinutos = Math.ceil(
         (horaEntrada.getTime() - inicioOficial.getTime()) / MS_POR_MINUTO,
