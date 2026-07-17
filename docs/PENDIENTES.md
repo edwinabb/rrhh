@@ -37,12 +37,15 @@ Dashboard del ciclo con advertencias antes de procesar: trabajadores sin cuenta 
 - [ ] Provisiones mensuales (CTS, gratificaciones, vacaciones) con asiento contable exportable
 - [ ] Ficha de alta de trabajador en el frontend (hoy el alta es por seed/API)
 - [ ] Boletas de pago (PDF) por empleado
+- [ ] Parametrizar comisión y prima de seguro AFP (hoy hardcodeadas en payroll-run y en el cálculo de cese — deuda heredada)
+- [ ] Integrar el pago de la liquidación de cese al archivo de telecrédito
+- [ ] Firma digital de los documentos de cese (hoy se generan sin firmar)
 
 ### Asistencia
 - [ ] Confirmar valores normativos marcados "sin confirmar" en el seed (UIT, RMV, tasas) contra fuente oficial — ver `docs/superpowers/specs/validaciones-normativas-pendientes.md`
 - [ ] Mapa interactivo para configurar geofence por sede
 - [ ] Expediente de inspección SUNAFIL (export masivo 5 años, PDF/Excel, <30s)
-- [ ] Vacaciones: programación, control de 30 días, alertas de vencimiento
+- [~] Vacaciones: récord por período con control de días y alerta de riesgo de indemnización HECHOS (módulo cese, 2026-07-17); falta programación del goce y flujo de aprobación de solicitudes
 - [ ] Flujo de aprobación de sobretiempo (jefe valida horas extra antes de nómina)
 
 ### Documental

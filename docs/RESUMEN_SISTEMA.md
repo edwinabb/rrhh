@@ -2,7 +2,7 @@
 
 Sistema de Gestión de Recursos Humanos (HRMS) para empresas peruanas, multi-empresa (multi-tenant) y con cumplimiento estricto de la normativa local (SUNAT, SUNAFIL, MTPE, Ley 29733).
 
-**Estado:** Backend Fases 0–4 operativo · 208 tests unitarios (26 suites) · Frontend completo (8 páginas) · Import/export CSV para sistemas externos
+**Estado:** Backend Fases 0–4 + módulo de cese y liquidación · 246 tests unitarios (31 suites) · Frontend completo (10 páginas) · Import/export CSV para sistemas externos
 
 **Repositorio:** https://github.com/edwinabb/rrhh
 
@@ -18,6 +18,8 @@ Frontend completo con shell autenticado: sidebar de navegación **filtrado por l
 | **Dashboard** | `/` | Tarjetas por módulo, filtradas por permisos del usuario. |
 | **Asistencia** | `/asistencia` | Marcar ENTRADA/SALIDA con GPS del navegador (validación de geofence visible), resumen mensual, justificaciones con aprobación gerencial, dashboard de equipo, **import CSV desde sistema biométrico externo**. |
 | **Nómina** | `/nomina` | Procesar planilla del período (con confirmación), exportes PLAME/telecrédito, **import CSV de novedades del período** (días, horas extra, bonos, descuentos). |
+| **Vacaciones** | `/vacaciones` | Récord vacacional por empleado: períodos con días ganados/gozados/pendientes, registro de goce, alerta de riesgo de indemnización (art. 23 D.Leg. 713). |
+| **Liquidaciones** | `/liquidaciones` | Ceses y liquidaciones: wizard de 3 pasos (crear → revisar snapshot → calcular), desglose por concepto con base legal, semáforo del plazo de 48h, aprobar/pagar/anular según permisos. |
 | **Legajo** | `/legajo` | Documentos por empleado agrupados por tipo (faltantes destacados), subida, descarga, eliminación con motivo (soft-delete), búsqueda. |
 | **Reclutamiento** | `/ats` y `/ats/[id]` | Vacantes con estados, registro de candidatos con consentimiento LPDP obligatorio, CV parseado con Claude API, pipeline de estados validado, notas internas, contratación. |
 | **Administración** | `/admin` | Parámetros normativos (nueva versión con vigencia), log de auditoría, empleados. |
@@ -87,6 +89,23 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | `POST /ats/candidatos/:id/notas` | `ats.manage` | Notas internas de RRHH sobre el candidato. |
 | `PUT /ats/candidatos/:id/contratar` | `ats.manage` | OFERTA → CONTRATADO y vincula al candidato con su registro `Employee` (migración formal según D.Leg. 728). |
 
+### Cese y Liquidación
+
+| Endpoint | Permiso | Qué hace |
+|----------|---------|----------|
+| `GET /vacaciones/periodos?employeeId=` | `vacation.read` | Récord vacacional del empleado: períodos con días ganados/gozados y estado (EN_CURSO, VENCIDO_PENDIENTE, GOZADO, LIQUIDADO). |
+| `POST /vacaciones/periodos` | `vacation.manage` | Crea un período vacacional (aniversario de ingreso); los días ganados salen del régimen del contrato (30 general/agrario, 15 MYPE). |
+| `PUT /vacaciones/periodos/:id` | `vacation.manage` | Actualiza días gozados, estado o notas (validación manual de rango y estado). |
+| `POST /ceses` | `termination.manage` | Registra el cese (empleado, fecha, motivo) y **pre-llena el snapshot** desde contrato, régimen pensionario, récord vacacional, horas extra y planillas del ejercicio. Nace BORRADOR; calcula la fecha límite de pago (48h, D.S. 001-97-TR). |
+| `GET /ceses` · `GET /ceses/:id` | `termination.read` | Listado y detalle con datos del empleado. |
+| `PUT /ceses/:id/datos` | `termination.manage` | RRHH corrige cualquier dato del snapshot; toda corrección regresa el cese a BORRADOR e invalida el cálculo anterior. |
+| `POST /ceses/:id/calcular` | `termination.manage` | Ejecuta el motor de liquidación con parámetros normativos vigentes a la fecha de cese: CTS/grati truncas (con factor MYPE), vacaciones devengadas/truncas/indemnización, indemnización por despido, matriz de afectación (ONP/AFP y 5ta solo sobre conceptos afectos). Transiciona a CALCULADA. |
+| `POST /ceses/:id/aprobar` | `termination.approve` | Valida completitud (derechohabientes en FALLECIMIENTO), **genera los 4 PDFs al legajo** (hoja de liquidación, certificado de trabajo, constancia de cese, certificado de retenciones 5ta), cesa al empleado y liquida sus períodos vacacionales. Si MinIO falla, el estado no avanza. |
+| `POST /ceses/:id/pagar` | `termination.approve` | Registra el pago; si excede el plazo de 48h marca `pagoFueraDePlazo` (evidencia para SUNAFIL). |
+| `POST /ceses/:id/anular` | `termination.approve` | Anula con motivo obligatorio; desde APROBADA revierte el estado del empleado y sus vacaciones. Un cese PAGADA no se anula. |
+
+**Flujo de estados:** BORRADOR → CALCULADA → APROBADA → PAGADA (ANULADA desde cualquiera salvo PAGADA). Regla a nivel BD: un solo cese vigente por empleado (índice único parcial).
+
 ---
 
 ## 🔐 Matriz de acceso por rol
@@ -94,6 +113,10 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Capacidad | Admin | RRHH | Manager | Employee |
 |-----------|-------|------|---------|----------|
 | Procesar/exportar nómina | ✓ | ✓ | ✗ | ✗ |
+| Ver récord vacacional | ✓ | ✓ | ✓ | ✗ |
+| Gestionar récord vacacional | ✓ | ✓ | ✗ | ✗ |
+| Registrar ceses y calcular liquidaciones | ✓ | ✓ | ✗ | ✗ |
+| Aprobar/pagar/anular liquidaciones | ✓ | ✗ | ✗ | ✗ |
 | Marcar asistencia / justificar | ✓ | ✓ | ✓ | ✓ |
 | Aprobar justificaciones / dashboard equipo | ✓ | ✓ | ✓ | ✗ |
 | Subir documentos | ✓ | ✓ | ✗ | ✗ |
@@ -114,7 +137,7 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Almacenamiento de archivos | MinIO (S3-compatible) |
 | IA | Claude API (parsing de CVs) |
 | Frontend | Next.js 14 + Tailwind CSS |
-| Testing | Jest — TDD, 182 tests unitarios |
+| Testing | Jest — TDD, 246 tests unitarios |
 
 **Principios de diseño:**
 - **Multi-tenant con RLS:** el aislamiento entre empresas se garantiza a nivel de base de datos, no solo de aplicación.
@@ -177,4 +200,4 @@ Ver el detalle priorizado en `docs/PENDIENTES.md`. Titulares:
 
 ---
 
-*Documento actualizado el 2026-07-14. Frontend y CSV verificados en vivo. Estado del código: rama `master`.*
+*Documento actualizado el 2026-07-17 con el módulo de cese y liquidación (rama `feat/liquidacion-cese`).*
