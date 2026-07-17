@@ -60,6 +60,9 @@ const PERMISSIONS = [
   { code: 'termination.approve', descripcion: 'Aprobar, pagar y anular liquidaciones', esSensible: true },
   { code: 'vacation.read', descripcion: 'Ver récord vacacional', esSensible: false },
   { code: 'vacation.manage', descripcion: 'Gestionar el récord vacacional', esSensible: false },
+  { code: 'shift.read', descripcion: 'Ver catálogo de turnos, plan y cumplimiento', esSensible: false },
+  { code: 'shift.manage', descripcion: 'Gestionar catálogo de turnos, plan e import CSV', esSensible: false },
+  { code: 'shift.resolve', descripcion: 'Resolver pendientes: intercambios y movimientos de compensatorios', esSensible: true },
 ] as const;
 
 // Roles de sistema (tenant_id null): plantilla que cada tenant puede clonar/editar
@@ -96,6 +99,9 @@ const SYSTEM_ROLES: Record<string, { descripcion: string; permissions: string[] 
       'termination.manage',
       'vacation.read',
       'vacation.manage',
+      'shift.read',
+      'shift.manage',
+      'shift.resolve',
     ],
   },
   Manager: {
@@ -111,6 +117,7 @@ const SYSTEM_ROLES: Record<string, { descripcion: string; permissions: string[] 
       'documents.read',
       'ats.read',
       'vacation.read',
+      'shift.read',
     ],
   },
   Employee: {
@@ -182,6 +189,11 @@ const NORMATIVE_PARAMETERS_SEED = [
     codigo: 'INDEMNIZACION_MYPE',
     valor: { mype_pequena: { diasPorAnio: 20, topeDias: 120 }, mype_micro: { diasPorAnio: 10, topeDias: 90 } },
     descripcion: 'Indemnización por despido en MYPE: remuneraciones diarias por año y tope — valor de referencia sin confirmar',
+  },
+  {
+    codigo: 'JORNADA_SEMANAL_MAXIMA',
+    valor: 48,
+    descripcion: 'Horas máximas de jornada semanal (D.Leg. 854) — valor de referencia sin confirmar',
   },
 ] as const;
 
