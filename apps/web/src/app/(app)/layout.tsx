@@ -18,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/asistencia', label: 'Asistencia', anyPermission: ['attendance.read'] },
   { href: '/nomina', label: 'Nómina', anyPermission: ['payroll.process'] },
   { href: '/vacaciones', label: 'Vacaciones', anyPermission: ['vacation.read'] },
+  { href: '/turnos', label: 'Turnos', anyPermission: ['shift.read'] },
   { href: '/liquidaciones', label: 'Liquidaciones', anyPermission: ['termination.read'] },
   { href: '/legajo', label: 'Legajo', anyPermission: ['documents.read'] },
   { href: '/ats', label: 'Reclutamiento', anyPermission: ['ats.read'] },
