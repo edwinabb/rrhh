@@ -316,4 +316,39 @@ describe('AttendanceService', () => {
       ).rejects.toThrow(/no encontrada/i);
     });
   });
+
+  describe('AttendanceService — integración con turnos', () => {
+    it('si TurnoRecalculoService maneja el día, no se ejecuta el recálculo estándar', async () => {
+      const entradaPrevia = {
+        id: 'marc-entrada',
+        tipo: 'ENTRADA',
+        timestamp: new Date('2026-07-13T08:00:00'),
+      };
+      const tx = buildTx({
+        marcacion: {
+          findMany: jest.fn().mockResolvedValue([entradaPrevia]),
+          create: jest
+            .fn()
+            .mockImplementation(({ data }) => Promise.resolve({ id: 'marc-salida', ...data })),
+        },
+      });
+
+      const turnoRecalculo = { recalcularConTurno: jest.fn().mockResolvedValue(true) } as any;
+      const serviceConTurno = new AttendanceService(turnoRecalculo);
+
+      await serviceConTurno.registrarMarcacion(tx as any, {
+        tenantId: TENANT,
+        employeeId: EMPLOYEE,
+        sedeId: SEDE,
+        tipo: 'SALIDA' as const,
+        timestamp: new Date('2026-07-13T17:00:00'),
+        latitud: GEO.latitud,
+        longitud: GEO.longitud,
+        creadoPor: USER,
+      });
+
+      expect(turnoRecalculo.recalcularConTurno).toHaveBeenCalled();
+      expect(tx.asistenciaResumen.upsert).not.toHaveBeenCalled();
+    });
+  });
 });
