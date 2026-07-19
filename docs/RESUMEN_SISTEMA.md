@@ -2,7 +2,7 @@
 
 Sistema de Gestión de Recursos Humanos (HRMS) para empresas peruanas, multi-empresa (multi-tenant) y con cumplimiento estricto de la normativa local (SUNAT, SUNAFIL, MTPE, Ley 29733).
 
-**Estado:** Backend Fases 0–4 + módulo de cese y liquidación · 246 tests unitarios (31 suites) · Frontend completo (10 páginas) · Import/export CSV para sistemas externos
+**Estado:** Backend Fases 0–5 + módulo de cese y liquidación · 284 tests unitarios (35 suites) · Frontend completo (11 páginas) · Import/export CSV para sistemas externos
 
 **Repositorio:** https://github.com/edwinabb/rrhh
 
@@ -19,6 +19,7 @@ Frontend completo con shell autenticado: sidebar de navegación **filtrado por l
 | **Asistencia** | `/asistencia` | Marcar ENTRADA/SALIDA con GPS del navegador (validación de geofence visible), resumen mensual, justificaciones con aprobación gerencial, dashboard de equipo, **import CSV desde sistema biométrico externo**. |
 | **Nómina** | `/nomina` | Procesar planilla del período (con confirmación), exportes PLAME/telecrédito, **import CSV de novedades del período** (días, horas extra, bonos, descuentos). |
 | **Vacaciones** | `/vacaciones` | Récord vacacional por empleado: períodos con días ganados/gozados/pendientes, registro de goce, alerta de riesgo de indemnización (art. 23 D.Leg. 713). |
+| **Turnos** | `/turnos` | Catálogo de turnos (horarios), plan de asignaciones semanales (importable/editable), libro de movimientos compensatorios (intercambios, ganancias, cruces con justificación) y flujo de resolución de inconsistencias (marcación vs. plan). |
 | **Liquidaciones** | `/liquidaciones` | Ceses y liquidaciones: wizard de 3 pasos (crear → revisar snapshot → calcular), desglose por concepto con base legal, semáforo del plazo de 48h, aprobar/pagar/anular según permisos. |
 | **Legajo** | `/legajo` | Documentos por empleado agrupados por tipo (faltantes destacados), subida, descarga, eliminación con motivo (soft-delete), búsqueda. |
 | **Reclutamiento** | `/ats` y `/ats/[id]` | Vacantes con estados, registro de candidatos con consentimiento LPDP obligatorio, CV parseado con Claude API, pipeline de estados validado, notas internas, contratación. |
@@ -89,6 +90,32 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | `POST /ats/candidatos/:id/notas` | `ats.manage` | Notas internas de RRHH sobre el candidato. |
 | `PUT /ats/candidatos/:id/contratar` | `ats.manage` | OFERTA → CONTRATADO y vincula al candidato con su registro `Employee` (migración formal según D.Leg. 728). |
 
+### Turnos (Fase 5 — feature-complete)
+
+| Endpoint | Permiso | Qué hace |
+|----------|---------|----------|
+| `GET /turnos` | `shift.read` | Lista todos los turnos del tenant: nombre, horario inicio/fin, duración, tolerancia. |
+| `POST /turnos` | `shift.manage` | Crea un nuevo turno (catálogo): nombre único, hora inicio/fin, duración total, tolerancia de entrada (minutos). |
+| `PUT /turnos/:id` | `shift.manage` | Actualiza catálogo de turno (nombre, horario, tolerancia). No afecta asignaciones existentes. |
+| `GET /turno-asignaciones?periodo=YYYY-MM` | `shift.read` | Plan semanal: quién está asignado a qué turno cada día. Manager ve su equipo; RRHH ve toda la empresa; Employee solo su plan. |
+| `POST /turno-asignaciones/import` | `shift.manage` | Importa plan desde CSV (empleado, fecha, turno) usando upsert — re-importar actualiza. Retorna `{procesadas, omitidas, errores[{fila, mensaje}]}`. |
+| `PUT /turno-asignaciones/:id` | `shift.manage` | Edita la asignación de un día (cambiar turno, cancelar). Dispara recálculo de horas extra si es turno de noche. |
+| `GET /compensatorio-movimientos?periodo=YYYY-MM` | `shift.read` | Libro de cambios: intercambios (empleado X cubre Y en fecha Z), ganancias (se le debe un día al empleado) y cruces (marcación diferente al plan). Resueltos (APROBADO, RECHAZADO) e irresueltos (PENDIENTE). |
+| `POST /compensatorio-movimientos/:id/resolver` | `shift.manage` | RRHH registra resultado: si es diferencia marcación vs. plan (cruce), categoriza como intercambio/ganancia/error. Calcula deuda o crédito y lo reserva en tabla `CompensatorioSaldo`. |
+| `GET /compensatorio-movimientos/saldo/:employeeId` | `shift.read` | Saldo actual del empleado: días que se le deben vs. días que debe. |
+| `PUT /compensatorio-movimientos/:id/marcar-goce` | `shift.manage` | En la vista del plan, marcar una celda como "DC" (día compensatorio) para que el empleado goce un día adeudado. Valida saldo > 0. |
+
+**Cálculo de horas y tolerancia:**
+- Turno ENTRADA hasta SALIDA, diferencia es base de horas
+- Si la entrada está dentro de la tolerancia configurada, cero tardanza
+- Horas extra: si las horas totales > jornada estándar (8h/48h), recargo 25%/35% (D.Leg. 854)
+- Turno nocturno (salida al día siguiente): fecha del resumen es del INICIO (lunes noche → resumen lunes, marcación hasta martes 08:00)
+
+**Flujo de resolución:**
+1. Sistema detecta diferencia: marcación muestra entrada 20:31 pero plan es 20:00 → CRUCE
+2. RRHH revisa, elige categoría: intercambio (X cubrió), ganancia (se le debe), error (justificante)
+3. Si ganancia: crea asiento en libro con saldo; empleado puede goce posterior (marcar DC)
+
 ### Cese y Liquidación
 
 | Endpoint | Permiso | Qué hace |
@@ -115,6 +142,9 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Procesar/exportar nómina | ✓ | ✓ | ✗ | ✗ |
 | Ver récord vacacional | ✓ | ✓ | ✓ | ✗ |
 | Gestionar récord vacacional | ✓ | ✓ | ✗ | ✗ |
+| Ver catálogo y plan de turnos | ✓ | ✓ | ✓ | ✓ |
+| Gestionar catálogo y plan de turnos | ✓ | ✓ | ✗ | ✗ |
+| Resolver diferencias (turnos) | ✓ | ✓ | ✗ | ✗ |
 | Registrar ceses y calcular liquidaciones | ✓ | ✓ | ✗ | ✗ |
 | Aprobar/pagar/anular liquidaciones | ✓ | ✗ | ✗ | ✗ |
 | Marcar asistencia / justificar | ✓ | ✓ | ✓ | ✓ |
@@ -122,7 +152,7 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Subir documentos | ✓ | ✓ | ✗ | ✗ |
 | Eliminar documentos | ✓ | ✗ | ✗ | ✗ |
 | Gestionar vacantes/candidatos | ✓ | ✓ | ✗ | ✗ |
-| Importar CSV (asistencia/novedades) | ✓ | ✓ | ✗ | ✗ |
+| Importar CSV (asistencia/novedades/turnos) | ✓ | ✓ | ✗ | ✗ |
 | Parámetros normativos (escribir) | ✓ | ✗ | ✗ | ✗ |
 
 ---
