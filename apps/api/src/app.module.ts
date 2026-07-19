@@ -15,6 +15,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { AtsModule } from './modules/ats/ats.module';
 import { VacationsModule } from './modules/vacations/vacations.module';
 import { TerminationModule } from './modules/termination/termination.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { TerminationModule } from './modules/termination/termination.module';
     AtsModule,
     VacationsModule,
     TerminationModule,
+    ShiftsModule,
   ],
   providers: [
     // Orden real de ejecución en Nest: guards -> interceptors, sin importar el
