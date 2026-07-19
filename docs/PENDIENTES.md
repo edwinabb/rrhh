@@ -1,12 +1,18 @@
 # Pendientes y Plan de Trabajo
 
-**Actualizado:** 2026-07-14 (fin de jornada) · **Estado del sistema:** todo verde — 208 tests, frontend completo, deploy local operativo.
+**Actualizado:** 2026-07-18 (cierre Task 14) · **Estado del sistema:** todo verde — 284 tests, frontend completo, módulo turnos con navegación y documentación.
 
 ---
 
-## 🎯 Plan de mañana (2026-07-15)
+## 🎯 Plan de integración post-turnos (próximo ciclo)
 
-Prioridad sugerida, en orden:
+El módulo de turnos está **feature-complete**: catálogo, plan, compensatorios, resolución de cruces, integración con asistencia y nómina. Prioridad sugerida para las próximas fases:
+
+### Turnos (próximas mejoras)
+- [ ] **Patrones de rotación auto-generados:** interfaz para definir patrones (ej: 2 días DIA + 2 noches NOCHE + 2 descansos, repetir semanalmente) e inyectarlos masivamente al plan. Requisito: descartado YAGNI en esta fase; si se necesita, será sencillo agregar — la BD y servicios ya soportan volumen.
+- [ ] **Aprobación de cambios de turno por empleado:** cuando un empleado propone cambiar su turno (intercambio con un compañero o rechazo), generar notificación a su manager para aprobación antes de actualizar el plan.
+- [ ] **Validación de horas extra semanales para turnistas:** advertencia si el plan proyecta >48h en la semana (acumulada entre varios turnos) para prevenir sobrecarga legal. Hoy se valida por día; la restricción semanal (D.Leg. 854) requiere vista agregada del período.
+- [ ] **Portal de autoservicio para intercambios:** los empleados negocian directamente en la UI quién cubre a quién; el gerente aprueba asincronamente.
 
 ### 1. Conectar los exportes de nómina a la BD real ⭐ (mayor valor, ~medio día)
 Los endpoints `GET /payroll/:periodo/export/plame` y `/export/telecredito` hoy retornan un stub `{mensaje}`. Los servicios `PlanillaExporter` (Estructura 18) y `BankFileExporter` (BCP) ya existen y están testeados — falta el cableado:
