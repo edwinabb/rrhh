@@ -13,6 +13,7 @@ import {
   calcularHorasExtraDiarias,
   JORNADA_MAXIMA_DIARIA_LEGAL,
 } from './calculators/horas-extra.calculator';
+import { TurnoRecalculoService } from './turno-recalculo.service';
 
 export interface RegistrarMarcacionInput {
   tenantId: string;
@@ -66,6 +67,8 @@ function finDelDia(fecha: Date): Date {
  */
 @Injectable()
 export class AttendanceService {
+  constructor(private readonly turnoRecalculo?: TurnoRecalculoService) {}
+
   /**
    * Registra una marcación de ENTRADA/SALIDA:
    * 1. Lee ConfiguracionAsistencia del tenant y el Geofence activo de la sede.
@@ -168,16 +171,24 @@ export class AttendanceService {
       return marcacion;
     }
 
-    // 6. SALIDA válida → recalcular resumen del día + horas extra diarias
+    // 6. SALIDA válida → recálculo. Primero el flujo de turnos (fecha de
+    //    turno); si el empleado no tiene plan, el flujo estándar de siempre.
     if (input.tipo === 'SALIDA') {
-      await this.recalcularResumenDelDia(
-        tx,
-        tenantId,
-        employeeId,
-        input.timestamp,
-        config,
-        [...marcacionesPrevias, marcacion],
-      );
+      const manejadoPorTurno = this.turnoRecalculo
+        ? await this.turnoRecalculo.recalcularConTurno(
+            tx, tenantId, employeeId, input.timestamp, config,
+          )
+        : false;
+      if (!manejadoPorTurno) {
+        await this.recalcularResumenDelDia(
+          tx,
+          tenantId,
+          employeeId,
+          input.timestamp,
+          config,
+          [...marcacionesPrevias, marcacion],
+        );
+      }
     }
 
     return marcacion;
