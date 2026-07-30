@@ -120,3 +120,51 @@ export const exportarNovedades = async (periodo: string): Promise<string> => {
   );
   return r.csv;
 };
+
+export type TipoDiaPatron = 'DIA' | 'NOCHE' | 'DESC';
+
+export interface RotacionPatron {
+  id: string;
+  nombre: string;
+  descripcion?: string | null;
+  secuencia: TipoDiaPatron[];
+  duracionCiclo: number;
+  activo: boolean;
+  creadoEn: string;
+  creadoPor: string;
+  actualizadoEn: string;
+  actualizadoPor: string;
+}
+
+export const listarPatrones = async (incluirInactivos = false): Promise<RotacionPatron[]> => {
+  const res = await apiFetch(`/turnos/patrones?incluirInactivos=${incluirInactivos}`);
+  if (!res.ok) {
+    throw new Error('No se pudo listar los patrones');
+  }
+  const patrones = await res.json();
+  return patrones.map((p: any) => ({
+    ...p,
+    secuencia: Array.isArray(p.secuencia) ? p.secuencia : JSON.parse(p.secuencia),
+  }));
+};
+
+export async function crearPatron(input: {
+  nombre: string;
+  descripcion?: string;
+  secuencia: TipoDiaPatron[];
+}): Promise<RotacionPatron> {
+  return ok(
+    await apiFetch('/turnos/patrones', { method: 'POST', body: JSON.stringify(input) }),
+    'crear el patrón',
+  );
+}
+
+export async function actualizarPatron(
+  id: string,
+  cambios: Partial<Omit<RotacionPatron, 'id' | 'creadoEn' | 'creadoPor' | 'actualizadoEn' | 'actualizadoPor'>>,
+): Promise<RotacionPatron> {
+  return ok(
+    await apiFetch(`/turnos/patrones/${id}`, { method: 'PUT', body: JSON.stringify(cambios) }),
+    'actualizar el patrón',
+  );
+}
