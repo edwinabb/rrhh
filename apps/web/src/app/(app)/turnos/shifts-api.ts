@@ -137,6 +137,8 @@ export interface RotacionPatron {
 }
 
 export const listarPatrones = async (incluirInactivos = false): Promise<RotacionPatron[]> => {
+  // Query string boolean is converted to "true"/"false" string by URL search params.
+  // Backend checks: incluirInactivos === 'true', so this format is correct.
   const res = await apiFetch(`/turnos/patrones?incluirInactivos=${incluirInactivos}`);
   if (!res.ok) {
     throw new Error('No se pudo listar los patrones');
