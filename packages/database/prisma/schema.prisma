@@ -40,6 +40,7 @@ model Tenant {
   turnos                   Turno[]
   turnoAsignaciones        TurnoAsignacion[]
   compensatorioMovimientos CompensatorioMovimiento[]
+  rotacionPatrones         RotacionPatron[]
 
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
@@ -798,6 +799,27 @@ model CompensatorioMovimiento {
 
   @@index([tenantId, employeeId])
   @@map("compensatorio_movimiento")
+}
+
+// Patrón de rotación de turnos (secuencia de turnos y descansos configurables).
+model RotacionPatron {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  nombre         String   // "2-2-2-1"
+  descripcion    String?
+  secuencia      String   // JSON-encoded array: ["DIA","DIA","NOCHE","NOCHE","DESC","DESC","DESC"]
+  duracionCiclo  Int      @map("duracion_ciclo") // Always 7
+  activo         Boolean  @default(true)
+  creadoEn       DateTime @default(now()) @map("creado_en")
+  creadoPor      String   @map("creado_por")
+  actualizadoEn  DateTime @updatedAt @map("actualizado_en")
+  actualizadoPor String?  @map("actualizado_por")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, nombre])
+  @@index([tenantId, activo])
+  @@map("rotacion_patron")
 }
 
 // ---------------------------------------------------------------------------
