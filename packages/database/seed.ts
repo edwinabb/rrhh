@@ -303,6 +303,18 @@ async function seedDemoTenant() {
     create: { tenantId: tenant.id }, // defaults: 08:00-17:00, tolerancia 15 min
   });
 
+  // Seed turnos DIA/NOCHE para patrones de rotación (requisito Task 3)
+  await prisma.turno.upsert({
+    where: { tenantId_codigo: { tenantId: tenant.id, codigo: 'DIA' } },
+    update: {},
+    create: { tenantId: tenant.id, codigo: 'DIA', nombre: 'Turno Día', horaInicio: '08:00', horaFin: '20:00', horasEsperadas: 12 },
+  });
+  await prisma.turno.upsert({
+    where: { tenantId_codigo: { tenantId: tenant.id, codigo: 'NOCHE' } },
+    update: {},
+    create: { tenantId: tenant.id, codigo: 'NOCHE', nombre: 'Turno Noche', horaInicio: '20:00', horaFin: '08:00', horasEsperadas: 12 },
+  });
+
   const demoUsers = [
     { email: 'admin@demo.pe', password: 'Admin123!', rol: 'Admin', doc: '45678901', nombres: 'Ana', apellidos: 'Torres Quispe', sueldo: 8000, sistema: 'afp' as const },
     { email: 'rrhh@demo.pe', password: 'Rrhh123!', rol: 'RRHH', doc: '41234567', nombres: 'Carlos', apellidos: 'Mendoza Ríos', sueldo: 5500, sistema: 'afp' as const },
