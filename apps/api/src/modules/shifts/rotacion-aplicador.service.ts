@@ -53,7 +53,11 @@ export class RotacionAplicadorService {
       let diaEnCiclo = this.calcularDiaEnCiclo(input.diaInicioCiclo, fechaActual);
 
       while (fechaActual <= input.hasta) {
-        const tipoDia = secuencia[diaEnCiclo % 7];
+        // Módulo matemático (no el resto con signo de JS): las fechas
+        // anteriores a diaInicioCiclo producen diaEnCiclo negativo y
+        // `-3 % 7 === -3` indexaría fuera de la secuencia.
+        const indiceCiclo = ((diaEnCiclo % 7) + 7) % 7;
+        const tipoDia = secuencia[indiceCiclo];
 
         // Aplicar ajustes manuales si existen
         const ajuste = input.ajustes?.find(a =>
@@ -81,7 +85,9 @@ export class RotacionAplicadorService {
             tenantId: input.tenantId,
             employeeId,
             fecha: fechaActual,
-            tipoDia: esTurno ? 'TURNO' : (tipoDiaFinal as 'DESCANSO' | 'DESCANSO_COMPENSATORIO'),
+            tipoDia: esTurno
+              ? 'TURNO'
+              : ((tipoDiaFinal === 'DESC' ? 'DESCANSO' : tipoDiaFinal) as 'DESCANSO' | 'DESCANSO_COMPENSATORIO'),
             ...(turnoId && { turnoId }),
             creadoPor: input.creadoPor,
           });
