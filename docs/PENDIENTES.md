@@ -1,21 +1,20 @@
 # Pendientes y Plan de Trabajo
 
-**Actualizado:** 2026-07-18 (cierre Task 14) · **Estado del sistema:** todo verde — 284 tests, frontend completo, módulo turnos con navegación y documentación.
+**Actualizado:** 2026-07-30 (Sprint 6 Feature 1 completo) · **Estado del sistema:** todo verde — 328 tests, frontend completo, módulo turnos con patrones de rotación (Feature 1).
 
 ---
 
-## 🎯 Turnos (Fases 6-9) — Autoservicio + Gestión Avanzada (PENDIENTE IMPLEMENTACIÓN)
+## 🎯 Turnos (Fases 6-9) — Autoservicio + Gestión Avanzada
 
 **Especificación:** `docs/superpowers/specs/2026-07-18-turnos-mejoras-phase-6-9.md`
 **Plan de implementación:** `docs/superpowers/plans/2026-07-18-turnos-mejoras-phase-6-9.md`
-**Inicio:** Lunes 2026-07-22 (4 sprints paralelos, ~80-90 tareas totales, ~3-4 semanas)
 
 4 features independientes con tabs separados en `/turnos`:
 
-1. **Sprint 6 - Patrones de Rotación:** Manager define patrón recurrente (ej: 2 DIA + 2 NOCHE + 2 DESC + 1 DESC) e inyecta masivamente al plan. ~18 tareas.
-2. **Sprint 7 - Cambios de Turno:** Empleado solicita cambio → Manager aprueba/rechaza → reintentos permitidos. ~15 tareas.
-3. **Sprint 8 - Trabajo Fuera de Turno:** Empleado reporta trabajo extra (tarea + fotos + timestamp) → Director/RRHH valida → genera compensatorio. Datos privados (Manager-only). ~20 tareas.
-4. **Sprint 9 - Portal de Intercambios:** Empleados negocian peer-to-peer (empleado A ↔ B) → Manager aprueba. Intercambios neutrales para compensatorios. ~15 tareas.
+1. **✅ Sprint 6 - Patrones de Rotación (COMPLETO):** Manager define patrón recurrente (ej: 2 DIA + 2 NOCHE + 3 DESC) e inyecta masivamente al plan. 9 tareas completadas (2026-07-30). Feature: catálogo de patrones + aplicador con preview editable + notificaciones + E2E testing. Tests: 328/328 pass.
+2. **⏳ Sprint 7 - Cambios de Turno:** Empleado solicita cambio → Manager aprueba/rechaza → reintentos permitidos. ~15 tareas.
+3. **⏳ Sprint 8 - Trabajo Fuera de Turno:** Empleado reporta trabajo extra (tarea + fotos + timestamp) → Director/RRHH valida → genera compensatorio. Datos privados (Manager-only). ~20 tareas.
+4. **⏳ Sprint 9 - Portal de Intercambios:** Empleados negocian peer-to-peer (empleado A ↔ B) → Manager aprueba. Intercambios neutrales para compensatorios. ~15 tareas.
 
 **Principios:**
 - Independencia: ciclos separados, permisos RBAC distintos, parallelizable
