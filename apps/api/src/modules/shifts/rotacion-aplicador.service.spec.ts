@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { RotacionAplicadorService } from './rotacion-aplicador.service';
 
 function mockTx(overrides: any = {}) {
@@ -50,5 +51,24 @@ describe('RotacionAplicadorService', () => {
         diaInicioCiclo: new Date(2026, 7, 4), creadoPor: 'u-1'
       })
     ).rejects.toThrow('Patrón no encontrado');
+  });
+
+  it('rechaza fechas en el pasado', async () => {
+    const tx = mockTx();
+    tx.rotacionPatron.findUnique.mockResolvedValue({
+      id: 'pat-1', secuencia: JSON.stringify(['DIA', 'DIA', 'NOCHE', 'NOCHE', 'DESC', 'DESC', 'DESC'])
+    });
+
+    await expect(
+      service.aplicarPatron(tx, {
+        tenantId: 't-1',
+        patronId: 'pat-1',
+        employeeIds: ['emp-1'],
+        desde: new Date(2020, 0, 1), // Past date
+        hasta: new Date(2020, 0, 31),
+        diaInicioCiclo: new Date(2020, 0, 4),
+        creadoPor: 'u-1',
+      })
+    ).rejects.toThrow(BadRequestException);
   });
 });
