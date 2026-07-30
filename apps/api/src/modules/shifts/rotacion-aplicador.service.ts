@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ShiftPlanService } from './shift-plan.service';
 
 export interface AplicarPatronInput {
@@ -17,6 +17,16 @@ export class RotacionAplicadorService {
   constructor(private readonly shiftPlan: ShiftPlanService) {}
 
   async aplicarPatron(tx: any, input: AplicarPatronInput): Promise<{ procesadas: number; errores: any[] }> {
+    // Validar fechas futuras (Global Constraint)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (input.desde < hoy) {
+      throw new BadRequestException('La fecha "desde" no puede estar en el pasado');
+    }
+    if (input.hasta < hoy) {
+      throw new BadRequestException('La fecha "hasta" no puede estar en el pasado');
+    }
+
     // Obtener patrón
     const patron = await tx.rotacionPatron.findUnique({ where: { id: input.patronId } });
     if (!patron) throw new NotFoundException('Patrón no encontrado');
