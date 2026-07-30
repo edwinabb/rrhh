@@ -8,6 +8,8 @@ import { ShiftPlanService, TipoDiaPlan } from './shift-plan.service';
 import { ShiftPlanImportService } from './shift-plan-import.service';
 import { CompensatorioService, TipoMovimientoCompensatorio } from './compensatorio.service';
 import { ShiftComplianceService } from './shift-compliance.service';
+import { RotacionPatronService } from './rotacion-patron.service';
+import { RotacionAplicadorService } from './rotacion-aplicador.service';
 
 const TIPOS_DIA: readonly TipoDiaPlan[] = ['TURNO', 'DESCANSO', 'DESCANSO_COMPENSATORIO'];
 const TIPOS_MOVIMIENTO: readonly TipoMovimientoCompensatorio[] = ['GANADO', 'AJUSTE_INICIAL'];
@@ -40,6 +42,8 @@ export class ShiftsController {
     private readonly planImport: ShiftPlanImportService,
     private readonly compensatorios: CompensatorioService,
     private readonly compliance: ShiftComplianceService,
+    private readonly rotacionPatron: RotacionPatronService,
+    private readonly rotacionAplicador: RotacionAplicadorService,
   ) {}
 
   // --- Catálogo ---
@@ -200,5 +204,63 @@ export class ShiftsController {
     return this.shiftPlan.obtenerPlan(
       ctx.tx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employee.id,
     );
+  }
+
+  // --- Patrones de rotación ---
+  @Get('patrones')
+  @RequirePermission('shift.read')
+  async listarPatrones(@Query('incluirInactivos') incluirInactivos?: string) {
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    return this.rotacionPatron.listarPatrones(ctx.tx, tenantId, incluirInactivos === 'true');
+  }
+
+  @Post('patrones')
+  @RequirePermission('shift.manage')
+  async crearPatron(@Body() dto: any) {
+    if (!dto?.nombre || !dto?.secuencia || !Array.isArray(dto.secuencia)) {
+      throw new BadRequestException('nombre y secuencia (array) son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    return this.rotacionPatron.crearPatron(ctx.tx, {
+      tenantId,
+      nombre: dto.nombre,
+      descripcion: dto.descripcion,
+      secuencia: dto.secuencia,
+      duracionCiclo: 7,
+      creadoPor: userId,
+    });
+  }
+
+  @Put('patrones/:id')
+  @RequirePermission('shift.manage')
+  async actualizarPatron(@Param('id') id: string, @Body() cambios: any) {
+    const ctx = getTenantContext();
+    const { userId } = requireIdentity(ctx);
+    return this.rotacionPatron.actualizarPatron(ctx.tx, id, {
+      ...cambios,
+      actualizadoPor: userId,
+    });
+  }
+
+  @Post('patrones/:id/aplicar')
+  @RequirePermission('shift.manage')
+  async aplicarPatron(@Param('id') patronId: string, @Body() dto: any) {
+    if (!dto?.employeeIds || !Array.isArray(dto.employeeIds) || !dto?.desde || !dto?.hasta || !dto?.diaInicioCiclo) {
+      throw new BadRequestException('employeeIds (array), desde, hasta y diaInicioCiclo son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    return this.rotacionAplicador.aplicarPatron(ctx.tx, {
+      tenantId,
+      patronId,
+      employeeIds: dto.employeeIds,
+      desde: parseFecha(dto.desde, 'desde'),
+      hasta: parseFecha(dto.hasta, 'hasta'),
+      diaInicioCiclo: parseFecha(dto.diaInicioCiclo, 'diaInicioCiclo'),
+      ajustes: dto.ajustes,
+      creadoPor: userId,
+    });
   }
 }
