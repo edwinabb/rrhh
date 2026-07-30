@@ -7,6 +7,7 @@ import { CumplimientoTab } from './cumplimiento-tab';
 import { CompensatoriosTab } from './compensatorios-tab';
 import { PatronesCatalogoTab } from './patrones-catalogo-tab';
 import { PatronesAplicarTab } from './patrones-aplicar-tab';
+import { MisCambiosTab } from './mis-cambios-tab';
 
 const TABS = [
   { id: 'plan', label: 'Plan' },
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'catalogo', label: 'Catálogo' },
   { id: 'patrones', label: 'Patrones Catálogo' },
   { id: 'aplicar', label: 'Aplicar Patrones' },
+  { id: 'mis-cambios', label: 'Mis Cambios' },
 ] as const;
 
 export default function TurnosPage() {
@@ -40,6 +42,7 @@ export default function TurnosPage() {
       {tab === 'catalogo' && <CatalogoTab />}
       {tab === 'patrones' && <PatronesCatalogoTab />}
       {tab === 'aplicar' && <PatronesAplicarTab />}
+      {tab === 'mis-cambios' && <MisCambiosTab />}
     </div>
   );
 }

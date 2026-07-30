@@ -186,3 +186,40 @@ export async function aplicarPatron(
     'aplicar el patrón',
   );
 }
+
+// ---------------------------------------------------------------------------
+// Cambios de Turno (Shift Change Requests)
+// ---------------------------------------------------------------------------
+
+export type EstadoCambio = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+
+export interface CambioSolicitud {
+  id: string;
+  employeeId: string;
+  fechaActual: string;
+  turnoIdActual: string | null;
+  fechaNueva: string;
+  turnoIdNuevo: string;
+  estado: EstadoCambio;
+  motivoRechazo?: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
+  turnoActual?: { codigo: string; nombre: string; horaInicio: string; horaFin: string } | null;
+  turnoNuevo?: { codigo: string; nombre: string; horaInicio: string; horaFin: string } | null;
+}
+
+export const listarMisCambios = async (): Promise<CambioSolicitud[]> =>
+  ok(await apiFetch('/turnos/cambios/mios'), 'listar mis cambios');
+
+export async function solicitarCambio(input: {
+  fechaActual: string;
+  turnoIdActual: string | null;
+  fechaNueva: string;
+  turnoIdNuevo: string;
+  creadoPor: string;
+}): Promise<CambioSolicitud> {
+  return ok(
+    await apiFetch('/turnos/cambios', { method: 'POST', body: JSON.stringify(input) }),
+    'solicitar el cambio',
+  );
+}
