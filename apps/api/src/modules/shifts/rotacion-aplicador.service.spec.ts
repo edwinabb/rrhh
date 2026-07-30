@@ -16,7 +16,8 @@ function mockTx(overrides: any = {}) {
 }
 
 const service = new RotacionAplicadorService(
-  { upsertAsignacion: jest.fn() } as any // ShiftPlanService mock
+  { upsertAsignacion: jest.fn() } as any, // ShiftPlanService mock
+  { notificarPatronAplicado: jest.fn().mockResolvedValue(undefined) } as any // NotificationService mock
 );
 
 describe('RotacionAplicadorService', () => {
