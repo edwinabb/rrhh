@@ -71,6 +71,77 @@ export class NotificationService {
   }
 
   /**
+   * Notifica al empleado que su solicitud de cambio de turno fue aprobada.
+   * No bloqueante: cualquier error se captura y se loguea.
+   */
+  async notificarSolicitudAprobada(
+    tenantId: string,
+    employeeId: string,
+    fechaNueva: Date,
+    nombreTurno?: string | null,
+  ): Promise<void> {
+    const detalleTurno = nombreTurno ? ` (${nombreTurno})` : '';
+    const mensaje = `Tu solicitud de cambio de turno para el ${fechaNueva.toDateString()}${detalleTurno} fue aprobada`;
+
+    try {
+      const empleado = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { id: true, user: { select: { email: true } } },
+      });
+
+      if (!empleado?.user?.email) {
+        this.logger.warn(
+          `Empleado ${employeeId} no tiene usuario/email asociado; se omite notificación de solicitud aprobada`,
+        );
+      } else {
+        await this.enviarEmail(empleado.user.email, 'Solicitud de cambio de turno aprobada', mensaje);
+      }
+
+      await this.crearNotificacionInApp(tenantId, employeeId, mensaje);
+    } catch (e) {
+      this.logger.error(
+        `Error notificando a empleado ${employeeId} sobre solicitud aprobada: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Notifica al empleado que su solicitud de cambio de turno fue rechazada.
+   * El motivoRechazo es de uso interno (manager/RRHH); no se incluye en el
+   * mensaje enviado al empleado, solo se registra en logs para trazabilidad.
+   * No bloqueante: cualquier error se captura y se loguea.
+   */
+  async notificarSolicitudRechazada(
+    tenantId: string,
+    employeeId: string,
+    motivoRechazo?: string | null,
+  ): Promise<void> {
+    const mensaje = 'Tu solicitud de cambio de turno fue rechazada';
+
+    try {
+      const empleado = await this.prisma.employee.findUnique({
+        where: { id: employeeId },
+        select: { id: true, user: { select: { email: true } } },
+      });
+
+      if (!empleado?.user?.email) {
+        this.logger.warn(
+          `Empleado ${employeeId} no tiene usuario/email asociado; se omite notificación de solicitud rechazada`,
+        );
+      } else {
+        await this.enviarEmail(empleado.user.email, 'Solicitud de cambio de turno rechazada', mensaje);
+      }
+
+      await this.crearNotificacionInApp(tenantId, employeeId, mensaje);
+      this.logger.log(`Solicitud rechazada para empleado ${employeeId} (tenant=${tenantId}). Motivo: ${motivoRechazo ?? 'sin motivo'}`);
+    } catch (e) {
+      this.logger.error(
+        `Error notificando a empleado ${employeeId} sobre solicitud rechazada: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
    * Punto de entrada único de envío de email. Sin transporte real
    * configurado en el repo; se deja registrado vía Logger para no bloquear
    * el flujo de negocio. Reemplazar el cuerpo cuando se integre un
