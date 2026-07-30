@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { RotacionPatron, TipoDiaPatron } from './shifts-api';
 
 export interface PatronFormModalProps {
@@ -23,6 +23,7 @@ export function PatronFormModal({ isOpen, onClose, onSave, patron, isLoading }: 
   const [secuencia, setSecuencia] = useState<TipoDiaPatron[]>(['DIA', 'NOCHE', 'DESC', 'DIA', 'NOCHE', 'DESC', 'DESC']);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const headingId = useRef('patron-form-heading');
 
   // Initialize form with patron data if editing
   useEffect(() => {
@@ -37,6 +38,18 @@ export function PatronFormModal({ isOpen, onClose, onSave, patron, isLoading }: 
     }
     setError(null);
   }, [patron, isOpen]);
+
+  // Handle Escape key to close modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSaving && !isLoading) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose, isSaving, isLoading]);
 
   const handleSave = async () => {
     if (!nombre.trim()) {
@@ -77,10 +90,26 @@ export function PatronFormModal({ isOpen, onClose, onSave, patron, isLoading }: 
 
   if (!isOpen) return null;
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Only close if clicking directly on backdrop, not on dialog content
+    if (e.target === e.currentTarget && !isSaving && !isLoading) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
-        <h2 className="mb-4 text-lg font-semibold">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+      onClick={handleBackdropClick}
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId.current}
+      >
+        <h2 id={headingId.current} className="mb-4 text-lg font-semibold">
           {patron ? 'Editar patrón' : 'Crear nuevo patrón'}
         </h2>
 
@@ -91,45 +120,48 @@ export function PatronFormModal({ isOpen, onClose, onSave, patron, isLoading }: 
         <div className="space-y-4">
           {/* Nombre */}
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="patron-nombre" className="block text-sm font-medium text-slate-700">
               Nombre del patrón
-              <input
-                type="text"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Turno Administrativo"
-                className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
-                disabled={isSaving || isLoading}
-              />
             </label>
+            <input
+              id="patron-nombre"
+              type="text"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Ej: Turno Administrativo"
+              className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+              disabled={isSaving || isLoading}
+            />
           </div>
 
           {/* Descripción */}
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="patron-descripcion" className="block text-sm font-medium text-slate-700">
               Descripción (opcional)
-              <input
-                type="text"
-                value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
-                placeholder="Ej: Rotación de 2 días, 2 noches, 3 descansos"
-                className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
-                disabled={isSaving || isLoading}
-              />
             </label>
+            <input
+              id="patron-descripcion"
+              type="text"
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Ej: Rotación de 2 días, 2 noches, 3 descansos"
+              className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
+              disabled={isSaving || isLoading}
+            />
           </div>
 
           {/* Duración del ciclo (readonly) */}
           <div>
-            <label className="block text-sm font-medium text-slate-700">
+            <label htmlFor="patron-duracion" className="block text-sm font-medium text-slate-700">
               Duración del ciclo (días)
-              <input
-                type="number"
-                value={7}
-                disabled
-                className="mt-1 block w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-slate-500"
-              />
             </label>
+            <input
+              id="patron-duracion"
+              type="number"
+              value={7}
+              disabled
+              className="mt-1 block w-full rounded border border-slate-300 bg-slate-50 px-3 py-2 text-slate-500"
+            />
           </div>
 
           {/* Quick presets */}
@@ -146,13 +178,6 @@ export function PatronFormModal({ isOpen, onClose, onSave, patron, isLoading }: 
                   {preset.label}
                 </button>
               ))}
-              <button
-                onClick={() => {}}
-                className="rounded border border-slate-300 px-3 py-1 text-sm text-slate-500"
-                disabled
-              >
-                [Personalizado]
-              </button>
             </div>
           </div>
 
@@ -162,12 +187,16 @@ export function PatronFormModal({ isOpen, onClose, onSave, patron, isLoading }: 
             <div className="grid grid-cols-7 gap-2">
               {secuencia.map((dia, index) => (
                 <div key={index} className="flex flex-col items-center">
-                  <label className="text-xs text-slate-500">Día {index + 1}</label>
+                  <label htmlFor={`patron-day-${index}`} className="text-xs text-slate-500">
+                    Día {index + 1}
+                  </label>
                   <select
+                    id={`patron-day-${index}`}
                     value={dia}
                     onChange={(e) => handleDayChange(index, e.target.value as TipoDiaPatron)}
                     disabled={isSaving || isLoading}
                     className="mt-1 rounded border border-slate-300 px-2 py-1 text-sm"
+                    aria-label={`Día ${index + 1} de la secuencia`}
                   >
                     <option value="DIA">DÍA</option>
                     <option value="NOCHE">NOCHE</option>
