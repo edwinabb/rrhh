@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ShiftPlanService } from './shift-plan.service';
+import { NotificationService } from '../../common/services/notification.service';
 
 export interface AplicarPatronInput {
   tenantId: string;
@@ -14,7 +15,10 @@ export interface AplicarPatronInput {
 
 @Injectable()
 export class RotacionAplicadorService {
-  constructor(private readonly shiftPlan: ShiftPlanService) {}
+  constructor(
+    private readonly shiftPlan: ShiftPlanService,
+    private readonly notificationService: NotificationService,
+  ) {}
 
   async aplicarPatron(tx: any, input: AplicarPatronInput): Promise<{ procesadas: number; errores: any[] }> {
     // Validar fechas futuras (Global Constraint)
@@ -90,6 +94,13 @@ export class RotacionAplicadorService {
         diaEnCiclo++;
       }
     }
+
+    // Notificación no bloqueante a los empleados afectados (email + in-app).
+    await this.notificationService.notificarPatronAplicado(
+      input.tenantId,
+      input.employeeIds,
+      patron.nombre,
+    );
 
     return { procesadas, errores };
   }
