@@ -804,16 +804,16 @@ model CompensatorioMovimiento {
 // Patrón de rotación de turnos (secuencia de turnos y descansos configurables).
 model RotacionPatron {
   id             String   @id @default(cuid())
-  tenantId       String   @map("tenant_id")
-  nombre         String   // "2-2-2-1"
+  tenantId       String   @map("tenant_id") @db.Uuid
+  nombre         String   @db.VarChar(255) // "2-2-2-1"
   descripcion    String?
   secuencia      String   // JSON-encoded array: ["DIA","DIA","NOCHE","NOCHE","DESC","DESC","DESC"]
   duracionCiclo  Int      @map("duracion_ciclo") // Always 7
   activo         Boolean  @default(true)
   creadoEn       DateTime @default(now()) @map("creado_en")
-  creadoPor      String   @map("creado_por")
+  creadoPor      String   @map("creado_por") @db.Uuid
   actualizadoEn  DateTime @updatedAt @map("actualizado_en")
-  actualizadoPor String?  @map("actualizado_por")
+  actualizadoPor String?  @map("actualizado_por") @db.Uuid
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
