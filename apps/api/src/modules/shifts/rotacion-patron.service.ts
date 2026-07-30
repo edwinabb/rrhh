@@ -6,7 +6,7 @@ export interface CrearPatronInput {
   descripcion?: string;
   secuencia: TipoDiaPlan[];
   duracionCiclo: number;
-  creadoPor?: string;
+  creadoPor: string;
 }
 
 export type TipoDiaPlan = 'DIA' | 'NOCHE' | 'DESC';
@@ -47,7 +47,7 @@ export class RotacionPatronService {
         descripcion: input.descripcion ?? null,
         secuencia: JSON.stringify(input.secuencia),
         duracionCiclo: input.duracionCiclo,
-        ...(input.creadoPor && { creadoPor: input.creadoPor }),
+        creadoPor: input.creadoPor,
       },
     });
   }
@@ -58,6 +58,20 @@ export class RotacionPatronService {
 
     if (cambios.secuencia && cambios.secuencia.length !== 7) {
       throw new BadRequestException('Secuencia debe tener exactamente 7 elementos');
+    }
+
+    // Validar nombre duplicado si se está cambiando el nombre
+    if (cambios.nombre && cambios.nombre !== patron.nombre) {
+      const duplicado = await tx.rotacionPatron.findFirst({
+        where: {
+          tenantId: patron.tenantId,
+          nombre: cambios.nombre,
+          NOT: { id },
+        },
+      });
+      if (duplicado) {
+        throw new ConflictException(`Ya existe un patrón con nombre "${cambios.nombre}"`);
+      }
     }
 
     return tx.rotacionPatron.update({
