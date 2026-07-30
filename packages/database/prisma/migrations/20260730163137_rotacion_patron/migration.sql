@@ -186,6 +186,20 @@ CREATE INDEX "rotacion_patron_tenant_id_activo_idx" ON "rotacion_patron"("tenant
 -- CreateIndex
 CREATE UNIQUE INDEX "rotacion_patron_tenant_id_nombre_key" ON "rotacion_patron"("tenant_id", "nombre");
 
+-- RLS (Row Level Security) for multi-tenant isolation
+ALTER TABLE "rotacion_patron" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "rotacion_patron" FORCE ROW LEVEL SECURITY;
+CREATE POLICY "tenant_isolation" ON "rotacion_patron"
+    USING ("tenant_id" = current_setting('app.tenant_id', true)::uuid);
+
+-- Access Control: RRHH/Admin can modify, all roles can read
+GRANT SELECT ON "rotacion_patron" TO app_rrhh, app_admin, app_manager, app_employee;
+GRANT INSERT, UPDATE ON "rotacion_patron" TO app_rrhh, app_admin;
+
+-- Audit Trail Integration (Fase 0)
+CREATE TRIGGER "rotacion_patron_audit" AFTER INSERT OR UPDATE OR DELETE ON "rotacion_patron"
+    FOR EACH ROW EXECUTE FUNCTION audit_trigger();
+
 -- AddForeignKey
 ALTER TABLE "sede" ADD CONSTRAINT "sede_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
