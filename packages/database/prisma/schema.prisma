@@ -41,6 +41,7 @@ model Tenant {
   turnoAsignaciones        TurnoAsignacion[]
   compensatorioMovimientos CompensatorioMovimiento[]
   rotacionPatrones         RotacionPatron[]
+  solicitudesCambioTurno   SolicitudCambioTurno[]
 
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
@@ -185,6 +186,7 @@ model Employee {
   vacacionPeriodos      VacacionPeriodo[]
   turnoAsignaciones        TurnoAsignacion[]
   compensatorioMovimientos CompensatorioMovimiento[]
+  solicitudesCambioTurno   SolicitudCambioTurno[]
 
   // Fase 2 — Asistencia
   marcaciones         Marcacion[]
@@ -740,6 +742,9 @@ model Turno {
   tenant       Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   asignaciones TurnoAsignacion[]
 
+  solicitudesComoActual SolicitudCambioTurno[] @relation("SolicitudCambioTurnoActual")
+  solicitudesComoNuevo  SolicitudCambioTurno[] @relation("SolicitudCambioTurnoNuevo")
+
   @@unique([tenantId, codigo])
   @@map("turno")
 }
@@ -771,6 +776,58 @@ model TurnoAsignacion {
   @@unique([tenantId, employeeId, fecha])
   @@index([tenantId, fecha])
   @@map("turno_asignacion")
+}
+
+enum EstadoSolicitudCambioTurno {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+
+  @@map("estado_solicitud_cambio_turno")
+}
+
+// Solicitud de cambio de turno: el empleado propone cambiar el turno asignado
+// en una fecha (o su descanso) por otro turno/descanso en la misma u otra
+// fecha. Requiere aprobación de manager/RRHH/Admin (flujo PENDIENTE →
+// APROBADA/RECHAZADA). La validación de que las fechas sean futuras se hace
+// en la capa de servicio, no en la base de datos.
+model SolicitudCambioTurno {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  employeeId     String   @map("employee_id") @db.Uuid
+  fechaSolicitud DateTime @default(now()) @map("fecha_solicitud")
+
+  // Turno que se desea cambiar (FROM)
+  fechaActual   DateTime @map("fecha_actual") @db.Date // fecha del turno_asignacion actual
+  turnoIdActual String?  @map("turno_id_actual") @db.Uuid // null si el día actual es DESCANSO
+
+  // Turno solicitado (TO)
+  fechaNueva   DateTime @map("fecha_nueva") @db.Date // fecha solicitada (puede ser distinta a fechaActual)
+  turnoIdNuevo String?  @map("turno_id_nuevo") @db.Uuid // null si se solicita DESCANSO
+
+  estado EstadoSolicitudCambioTurno @default(PENDIENTE)
+
+  // Decisión
+  fechaDecision DateTime? @map("fecha_decision")
+  decididoPor   String?   @map("decidido_por") @db.Uuid // user id del manager/RRHH/Admin
+  motivoRechazo String?   @map("motivo_rechazo") @db.Text // solo visible para manager/RRHH/Admin
+
+  // Auditoría
+  creadoEn       DateTime  @default(now()) @map("creado_en")
+  creadoPor      String    @map("creado_por") @db.Uuid
+  actualizadoEn  DateTime  @updatedAt @map("actualizado_en")
+  actualizadoPor String?   @map("actualizado_por") @db.Uuid
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  turnoActual Turno?   @relation("SolicitudCambioTurnoActual", fields: [turnoIdActual], references: [id])
+  turnoNuevo  Turno?   @relation("SolicitudCambioTurnoNuevo", fields: [turnoIdNuevo], references: [id])
+
+  @@unique([tenantId, employeeId, fechaActual]) // una solicitud por empleado y fecha
+  @@index([tenantId, estado])
+  @@index([tenantId, employeeId])
+  @@index([decididoPor])
+  @@map("solicitud_cambio_turno")
 }
 
 enum TipoMovimientoCompensatorio {
