@@ -21,7 +21,7 @@ describe('RotacionPatronService', () => {
     const tx = mockTx();
     await expect(
       service.crearPatron(tx, {
-        tenantId: 't-1', nombre: 'X', secuencia: ['DIA', 'NOCHE'], duracionCiclo: 2
+        tenantId: 't-1', nombre: 'X', secuencia: ['DIA', 'NOCHE'], duracionCiclo: 2, creadoPor: 'u-1'
       })
     ).rejects.toThrow(BadRequestException);
   });
@@ -31,7 +31,7 @@ describe('RotacionPatronService', () => {
     tx.rotacionPatron.findFirst.mockResolvedValue({ id: 'pat-1' });
     await expect(
       service.crearPatron(tx, {
-        tenantId: 't-1', nombre: '2-2-2-1', secuencia: ['DIA', 'DIA', 'NOCHE', 'NOCHE', 'DESC', 'DESC', 'DESC'], duracionCiclo: 7
+        tenantId: 't-1', nombre: '2-2-2-1', secuencia: ['DIA', 'DIA', 'NOCHE', 'NOCHE', 'DESC', 'DESC', 'DESC'], duracionCiclo: 7, creadoPor: 'u-1'
       })
     ).rejects.toThrow(ConflictException);
   });
@@ -58,5 +58,14 @@ describe('RotacionPatronService', () => {
     await expect(
       service.actualizarPatron(tx, 'pat-999', { nombre: 'X' })
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('actualizarPatron rechaza duplicate nombre', async () => {
+    const tx = mockTx();
+    tx.rotacionPatron.findUnique.mockResolvedValue({ id: 'pat-1', nombre: '2-2-2-1', tenantId: 't-1' });
+    tx.rotacionPatron.findFirst.mockResolvedValue({ id: 'pat-2', nombre: 'nuevo-nombre' });
+    await expect(
+      service.actualizarPatron(tx, 'pat-1', { nombre: 'nuevo-nombre' })
+    ).rejects.toThrow(ConflictException);
   });
 });
