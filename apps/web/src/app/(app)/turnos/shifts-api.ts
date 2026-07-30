@@ -170,3 +170,19 @@ export async function actualizarPatron(
     'actualizar el patrón',
   );
 }
+
+export async function aplicarPatron(
+  patronId: string,
+  input: {
+    employeeIds: string[];
+    desde: string;
+    hasta: string;
+    diaInicioCiclo: string;
+    ajustes?: Array<{ fecha: string; tipoDia: TipoDiaPatron }>;
+  },
+): Promise<{ procesadas: number; errores: Array<{ employeeId: string; mensaje: string }> }> {
+  return ok(
+    await apiFetch(`/turnos/patrones/${patronId}/aplicar`, { method: 'POST', body: JSON.stringify(input) }),
+    'aplicar el patrón',
+  );
+}
