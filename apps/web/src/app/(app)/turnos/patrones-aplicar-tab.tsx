@@ -67,6 +67,7 @@ export function PatronesAplicarTab() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [ajustes, setAjustes] = useState<Map<string, TipoDiaPatron>>(new Map());
   const [showConfirm, setShowConfirm] = useState(false);
   const confirmHeadingId = useRef('confirm-heading');
 
@@ -102,11 +103,23 @@ export function PatronesAplicarTab() {
           Array.from(selectedEmployeeIds),
         );
         setPreview(preview);
+        setAjustes(new Map());
+        setIsEditing(false);
       }
     } else {
       setPreview([]);
+      setAjustes(new Map());
+      setIsEditing(false);
     }
   }, [selectedPatronId, desde, hasta, diaInicioCiclo, selectedEmployeeIds, patrones]);
+
+  const handleAjusteChange = (fecha: string, tipoDia: TipoDiaPatron) => {
+    setAjustes((prev) => {
+      const next = new Map(prev);
+      next.set(fecha, tipoDia);
+      return next;
+    });
+  };
 
   const handleToggleEmployee = (employeeId: string) => {
     const newSet = new Set(selectedEmployeeIds);
@@ -147,11 +160,13 @@ export function PatronesAplicarTab() {
     setError(null);
     setSuccess(null);
     try {
+      const ajustesArray = Array.from(ajustes.entries()).map(([fecha, tipoDia]) => ({ fecha, tipoDia }));
       const resultado = await aplicarPatron(selectedPatronId, {
         employeeIds: Array.from(selectedEmployeeIds),
         desde,
         hasta,
         diaInicioCiclo,
+        ...(ajustesArray.length > 0 ? { ajustes: ajustesArray } : {}),
       });
       setSuccess(`Patrón aplicado: ${resultado.procesadas} empleados procesados${resultado.errores.length > 0 ? `, ${resultado.errores.length} errores` : ''}`);
       // Limpiar formulario
@@ -161,6 +176,7 @@ export function PatronesAplicarTab() {
       setHasta('');
       setDiaInicioCiclo('');
       setPreview([]);
+      setAjustes(new Map());
       setIsEditing(false);
     } catch (e) {
       setError((e as Error).message);
@@ -310,6 +326,8 @@ export function PatronesAplicarTab() {
               {preview.map((day, idx) => {
                 const dayOfWeek = new Date(day.fecha).getDay();
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const tipoEfectivo = ajustes.get(day.fecha) ?? day.tipoDia;
+                const fueAjustado = ajustes.has(day.fecha);
                 const colorMap: Record<TipoDiaPatron, string> = {
                   DIA: 'bg-blue-50',
                   NOCHE: 'bg-purple-50',
@@ -323,10 +341,24 @@ export function PatronesAplicarTab() {
                 return (
                   <div
                     key={idx}
-                    className={`min-h-12 border border-slate-200 px-1 py-1 text-center text-xs ${colorMap[day.tipoDia]} ${isWeekend ? 'border-slate-300 font-semibold' : ''}`}
+                    className={`min-h-12 border border-slate-200 px-1 py-1 text-center text-xs ${colorMap[tipoEfectivo]} ${isWeekend ? 'border-slate-300 font-semibold' : ''} ${fueAjustado ? 'ring-2 ring-inset ring-amber-400' : ''}`}
                   >
                     <div className="font-semibold text-slate-900">{new Date(day.fecha).getDate()}</div>
-                    <div className="text-slate-600">{labelMap[day.tipoDia]}</div>
+                    {isEditing ? (
+                      <select
+                        aria-label={`Tipo de día para ${day.fecha}`}
+                        value={tipoEfectivo}
+                        onChange={(e) => handleAjusteChange(day.fecha, e.target.value as TipoDiaPatron)}
+                        disabled={isLoading}
+                        className="mt-1 w-full rounded border border-slate-300 bg-white text-[10px] px-0.5 py-0.5"
+                      >
+                        <option value="DIA">D</option>
+                        <option value="NOCHE">N</option>
+                        <option value="DESC">-</option>
+                      </select>
+                    ) : (
+                      <div className="text-slate-600">{labelMap[tipoEfectivo]}</div>
+                    )}
                   </div>
                 );
               })}
@@ -351,7 +383,21 @@ export function PatronesAplicarTab() {
 
       {/* Botones de acción */}
       {preview.length > 0 && (
-        <div className="flex gap-3 justify-end">
+        <div className="flex items-center gap-3 justify-end">
+          {ajustes.size > 0 && (
+            <span className="text-xs text-amber-700">
+              {ajustes.size} día{ajustes.size !== 1 ? 's' : ''} ajustado{ajustes.size !== 1 ? 's' : ''}
+            </span>
+          )}
+          {isEditing && ajustes.size > 0 && (
+            <button
+              onClick={() => setAjustes(new Map())}
+              disabled={isLoading}
+              className="rounded border border-slate-300 px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Descartar cambios
+            </button>
+          )}
           <button
             onClick={() => setIsEditing(!isEditing)}
             disabled={isLoading}
@@ -388,7 +434,11 @@ export function PatronesAplicarTab() {
             </h2>
             <p className="mb-4 text-sm text-slate-700">
               Esto aplicará el patrón a {selectedEmployeeIds.size} empleado{selectedEmployeeIds.size !== 1 ? 's' : ''} desde{' '}
-              {desde} hasta {hasta}. ¿Está seguro?
+              {desde} hasta {hasta}
+              {ajustes.size > 0
+                ? `, con ${ajustes.size} ajuste${ajustes.size !== 1 ? 's' : ''} manual${ajustes.size !== 1 ? 'es' : ''} sobre la vista previa`
+                : ''}
+              . ¿Está seguro?
             </p>
             <div className="flex justify-end gap-3">
               <button
