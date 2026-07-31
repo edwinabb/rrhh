@@ -9,6 +9,7 @@ import { RotacionAplicadorService } from './rotacion-aplicador.service';
 import { SolicitudCambioTurnoService } from './solicitud-cambio-turno.service';
 import { SolicitudCambioTurnoAplicadorService } from './solicitud-cambio-turno-aplicador.service';
 import { SolicitudTrabajoAdicionalService } from './solicitud-trabajo-adicional.service';
+import { SolicitudTrabajoAdicionalAplicadorService } from './solicitud-trabajo-adicional-aplicador.service';
 import { AttendanceModule } from '../attendance/attendance.module';
 import { NormativeParamsModule } from '../normative-params/normative-params.module';
 import { NotificationService } from '../../common/services/notification.service';
@@ -26,6 +27,7 @@ import { NotificationService } from '../../common/services/notification.service'
     SolicitudCambioTurnoService,
     SolicitudCambioTurnoAplicadorService,
     SolicitudTrabajoAdicionalService,
+    SolicitudTrabajoAdicionalAplicadorService,
     NotificationService,
   ],
 })
