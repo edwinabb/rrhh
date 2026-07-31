@@ -1,6 +1,7 @@
 import {
-  BadRequestException, Body, Controller, Get, Param, Post, Put, Query, UseGuards,
+  BadRequestException, Body, Controller, Get, Param, Post, Put, Query, UseGuards, Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { getTenantContext, TenantContext } from '../../common/database/tenant-request-context';
@@ -10,6 +11,8 @@ import { CompensatorioService, TipoMovimientoCompensatorio } from './compensator
 import { ShiftComplianceService } from './shift-compliance.service';
 import { RotacionPatronService } from './rotacion-patron.service';
 import { RotacionAplicadorService } from './rotacion-aplicador.service';
+import { SolicitudCambioTurnoService } from './solicitud-cambio-turno.service';
+import { SolicitudCambioTurnoAplicadorService } from './solicitud-cambio-turno-aplicador.service';
 
 const TIPOS_DIA: readonly TipoDiaPlan[] = ['TURNO', 'DESCANSO', 'DESCANSO_COMPENSATORIO'];
 const TIPOS_MOVIMIENTO: readonly TipoMovimientoCompensatorio[] = ['GANADO', 'AJUSTE_INICIAL'];
@@ -44,7 +47,31 @@ export class ShiftsController {
     private readonly compliance: ShiftComplianceService,
     private readonly rotacionPatron: RotacionPatronService,
     private readonly rotacionAplicador: RotacionAplicadorService,
+    private readonly solicitudCambioTurno: SolicitudCambioTurnoService,
+    private readonly solicitudCambioTurnoAplicador: SolicitudCambioTurnoAplicadorService,
   ) {}
+
+  private filtrarMotivoRechazoParaNoManagers(
+    solicitudes: any | any[],
+    request: Request,
+  ): any | any[] {
+    const permissions = (request.session as any)?.permissions ?? [];
+    const tienePermiso = permissions.includes('shift.manage');
+
+    if (tienePermiso) {
+      return solicitudes;
+    }
+
+    const filtrar = (solicitud: any) => {
+      const { motivoRechazo, ...resto } = solicitud;
+      return resto;
+    };
+
+    if (Array.isArray(solicitudes)) {
+      return solicitudes.map(filtrar);
+    }
+    return filtrar(solicitudes);
+  }
 
   // --- Catálogo ---
   @Get()
@@ -204,6 +231,104 @@ export class ShiftsController {
     return this.shiftPlan.obtenerPlan(
       ctx.tx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employee.id,
     );
+  }
+
+  // --- Solicitud de cambio de turno ---
+  @Post('cambios')
+  @RequirePermission('shift.manage')
+  async crearSolicitudCambio(@Body() dto: any) {
+    if (!dto?.fechaActual || !dto?.fechaNueva || !dto?.creadoPor) {
+      throw new BadRequestException('fechaActual, fechaNueva y creadoPor son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!employee) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    return this.solicitudCambioTurno.crearSolicitud(ctx.tx, {
+      tenantId,
+      employeeId: employee.id,
+      fechaActual: parseFecha(dto.fechaActual, 'fechaActual'),
+      turnoIdActual: dto.turnoIdActual ?? undefined,
+      fechaNueva: parseFecha(dto.fechaNueva, 'fechaNueva'),
+      turnoIdNuevo: dto.turnoIdNuevo ?? undefined,
+      creadoPor: dto.creadoPor,
+    });
+  }
+
+  @Get('cambios')
+  @RequirePermission('shift.read')
+  async listarSolicitudesCambio(
+    @Req() request: Request,
+    @Query('estado') estado?: string,
+    @Query('employeeId') employeeId?: string,
+    @Query('decididoPor') decididoPor?: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+
+    const filtros: any = { tenantId };
+    if (estado) filtros.estado = estado;
+    if (employeeId) filtros.employeeId = employeeId;
+    if (decididoPor) filtros.decididoPor = decididoPor;
+    if (fechaDesde) filtros.fechaDesde = parseFecha(fechaDesde, 'fechaDesde');
+    if (fechaHasta) filtros.fechaHasta = parseFecha(fechaHasta, 'fechaHasta');
+
+    const solicitudes = await this.solicitudCambioTurno.listarSolicitudes(ctx.tx, filtros);
+    return this.filtrarMotivoRechazoParaNoManagers(solicitudes, request);
+  }
+
+  @Get('cambios/mios')
+  @RequirePermission('shift.read')
+  async listarMisSolicitudesCambio(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!employee) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    const solicitudes = await this.solicitudCambioTurno.listarMisSolicitudes(
+      ctx.tx,
+      tenantId,
+      employee.id,
+    );
+    return this.filtrarMotivoRechazoParaNoManagers(solicitudes, request);
+  }
+
+  @Put('cambios/:id/aprobar')
+  @RequirePermission('shift.manage')
+  async aprobarSolicitudCambio(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.decididoPor) {
+      throw new BadRequestException('decididoPor es obligatorio');
+    }
+    const ctx = getTenantContext();
+    const solicitud = await this.solicitudCambioTurnoAplicador.aprobarSolicitud(
+      ctx.tx,
+      id,
+      dto.decididoPor,
+    );
+    return this.filtrarMotivoRechazoParaNoManagers(solicitud, request);
+  }
+
+  @Put('cambios/:id/rechazar')
+  @RequirePermission('shift.manage')
+  async rechazarSolicitudCambio(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.decididoPor || !dto?.motivoRechazo) {
+      throw new BadRequestException('decididoPor y motivoRechazo son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const solicitud = await this.solicitudCambioTurnoAplicador.rechazarSolicitud(
+      ctx.tx,
+      id,
+      dto.decididoPor,
+      dto.motivoRechazo,
+    );
+    return this.filtrarMotivoRechazoParaNoManagers(solicitud, request);
   }
 
   // --- Patrones de rotación ---
