@@ -223,3 +223,35 @@ export async function solicitarCambio(input: {
     'solicitar el cambio',
   );
 }
+
+export interface FiltrosCambios {
+  estado?: EstadoCambio;
+  employeeId?: string;
+  decididoPor?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+}
+
+export const listarCambios = async (filtros?: FiltrosCambios): Promise<CambioSolicitud[]> => {
+  const params = new URLSearchParams();
+  if (filtros?.estado) params.append('estado', filtros.estado);
+  if (filtros?.employeeId) params.append('employeeId', filtros.employeeId);
+  if (filtros?.decididoPor) params.append('decididoPor', filtros.decididoPor);
+  if (filtros?.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+  if (filtros?.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+
+  const qs = params.toString();
+  return ok(await apiFetch(`/turnos/cambios${qs ? `?${qs}` : ''}`), 'listar cambios');
+};
+
+export const aprobarCambio = async (id: string, decididoPor: string): Promise<CambioSolicitud> =>
+  ok(
+    await apiFetch(`/turnos/cambios/${id}/aprobar`, { method: 'PUT', body: JSON.stringify({ decididoPor }) }),
+    'aprobar el cambio',
+  );
+
+export const rechazarCambio = async (id: string, decididoPor: string, motivoRechazo: string): Promise<CambioSolicitud> =>
+  ok(
+    await apiFetch(`/turnos/cambios/${id}/rechazar`, { method: 'PUT', body: JSON.stringify({ decididoPor, motivoRechazo }) }),
+    'rechazar el cambio',
+  );
