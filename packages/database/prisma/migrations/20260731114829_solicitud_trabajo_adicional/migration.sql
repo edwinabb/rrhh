@@ -33,10 +33,10 @@ CREATE TABLE "solicitud_trabajo_adicional" (
 );
 
 -- CreateIndex
-CREATE INDEX "solicitud_trabajo_adicional_tenant_id_employee_id_solicitante_idx" ON "solicitud_trabajo_adicional"("tenant_id", "employee_id_solicitante");
+CREATE INDEX "solicitud_trabajo_adicional_tenant_solicitante_idx" ON "solicitud_trabajo_adicional"("tenant_id", "employee_id_solicitante");
 
 -- CreateIndex
-CREATE INDEX "solicitud_trabajo_adicional_tenant_id_employee_id_asignado_idx" ON "solicitud_trabajo_adicional"("tenant_id", "employee_id_asignado");
+CREATE INDEX "solicitud_trabajo_adicional_tenant_asignado_idx" ON "solicitud_trabajo_adicional"("tenant_id", "employee_id_asignado");
 
 -- CreateIndex
 CREATE INDEX "solicitud_trabajo_adicional_tenant_id_estado_idx" ON "solicitud_trabajo_adicional"("tenant_id", "estado");
