@@ -8,6 +8,7 @@ import {
   calcularHorasExtraDiarias,
   JORNADA_MAXIMA_DIARIA_LEGAL,
 } from './calculators/horas-extra.calculator';
+import { TurnoRecalculoService } from './turno-recalculo.service';
 
 /**
  * Import de marcaciones de asistencia desde un sistema biométrico externo
@@ -140,6 +141,8 @@ function finDelDia(fecha: Date): Date {
 
 @Injectable()
 export class AttendanceImportService {
+  constructor(private readonly turnoRecalculo?: TurnoRecalculoService) {}
+
   /**
    * Plantilla CSV descargable: BOM UTF-8 (para que Excel detecte el
    * encoding) + header + 2 filas de ejemplo. CRLF para compatibilidad Excel.
@@ -184,7 +187,7 @@ export class AttendanceImportService {
     // Cache de empleados por documento (evita repetir findFirst por fila)
     const empleadosPorDocumento = new Map<string, any | null>();
     // Días afectados a recalcular: clave employeeId|YYYY-MM-DD
-    const diasAfectados = new Map<string, { employeeId: string; fecha: Date }>();
+    const diasAfectados = new Map<string, { employeeId: string; fecha: Date; timestampEjemplo: Date }>();
 
     const lineas = contenidoCsv.replace(/^﻿/, '').split(/\r?\n/);
 
@@ -289,8 +292,15 @@ export class AttendanceImportService {
     }
 
     // Recalcular resumen + horas extra diarias de cada día afectado
-    for (const { employeeId, fecha } of diasAfectados.values()) {
-      await this.recalcularResumenDelDia(tx, tenantId, employeeId, fecha, config);
+    for (const { employeeId, fecha, timestampEjemplo } of diasAfectados.values()) {
+      const manejadoPorTurno = this.turnoRecalculo
+        ? await this.turnoRecalculo.recalcularConTurno(
+            tx, tenantId, employeeId, timestampEjemplo, config,
+          )
+        : false;
+      if (!manejadoPorTurno) {
+        await this.recalcularResumenDelDia(tx, tenantId, employeeId, fecha, config);
+      }
     }
 
     return resultado;
@@ -298,14 +308,14 @@ export class AttendanceImportService {
 
   /** Registra el (employee, fecha) como pendiente de recálculo (dedup por día). */
   private marcarDiaAfectado(
-    diasAfectados: Map<string, { employeeId: string; fecha: Date }>,
+    diasAfectados: Map<string, { employeeId: string; fecha: Date; timestampEjemplo: Date }>,
     employeeId: string,
     timestamp: Date,
   ): void {
     const fecha = inicioDelDia(timestamp);
     const clave = `${employeeId}|${fecha.toISOString()}`;
     if (!diasAfectados.has(clave)) {
-      diasAfectados.set(clave, { employeeId, fecha });
+      diasAfectados.set(clave, { employeeId, fecha, timestampEjemplo: timestamp });
     }
   }
 

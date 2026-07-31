@@ -1,12 +1,34 @@
 # Pendientes y Plan de Trabajo
 
-**Actualizado:** 2026-07-14 (fin de jornada) · **Estado del sistema:** todo verde — 208 tests, frontend completo, deploy local operativo.
+**Actualizado:** 2026-07-30 (Sprint 7 5/9 tareas, v1.3.0) · **Estado del sistema:** todo verde — 104 tests pass, Sprint 6 completo (Feature 1 Patrones), Sprint 7 55% (Feature 2 Cambios en progreso).
 
 ---
 
-## 🎯 Plan de mañana (2026-07-15)
+## 🎯 Turnos (Fases 6-9) — Autoservicio + Gestión Avanzada
 
-Prioridad sugerida, en orden:
+**Especificación:** `docs/superpowers/specs/2026-07-18-turnos-mejoras-phase-6-9.md`
+**Plan de implementación:** `docs/superpowers/plans/2026-07-18-turnos-mejoras-phase-6-9.md`
+
+4 features independientes con tabs separados en `/turnos`:
+
+1. **✅ Sprint 6 - Patrones de Rotación (COMPLETO):** Manager define patrón recurrente (ej: 2 DIA + 2 NOCHE + 3 DESC) e inyecta masivamente al plan. 9/9 tareas completadas (2026-07-30). Feature: catálogo de patrones + aplicador con preview editable + notificaciones + E2E testing. Tests: 328/328 pass. PR merged.
+2. **⏳ Sprint 7 - Cambios de Turno (EN PROGRESO 5/9):** Empleado solicita cambio → Manager aprueba/rechaza → reintentos permitidos. 5/9 tareas completadas (backend + frontend core). Modelo + CRUD + lógica transaccional + API endpoints + "Mis Cambios" tab. Pendientes: manager board + notificaciones + E2E + verificación. PR #1 awaiting review.
+3. **⏳ Sprint 8 - Trabajo Fuera de Turno:** Empleado reporta trabajo extra (tarea + fotos + timestamp) → Director/RRHH valida → genera compensatorio. Datos privados (Manager-only). ~20 tareas.
+4. **⏳ Sprint 9 - Portal de Intercambios:** Empleados negocian peer-to-peer (empleado A ↔ B) → Manager aprueba. Intercambios neutrales para compensatorios. ~15 tareas.
+
+**Principios:**
+- Independencia: ciclos separados, permisos RBAC distintos, parallelizable
+- Notificaciones: email + in-app en cada cambio de estado
+- Auditoría: quién, cuándo, decisión, motivo
+- Datos privados (Feature 3): horasAcumuladas, causaHorasExtras, saldoCompensatorios solo para Manager/Director
+- Fotos con timestamp visible en imagen (Feature 3)
+- Reporte rechazado permite reintentos infinitos hasta validación (Feature 3)
+
+---
+
+## 🎯 Plan de integración post-turnos (después de Fases 6-9)
+
+El módulo de turnos base está **feature-complete** (Fase 5): catálogo, plan, compensatorios, resolución de cruces, integración con asistencia y nómina. Fases 6-9 agregan autoservicio (patterning, cambios, intercambios) y auditoría (trabajo extra). Prioridad sugerida para las próximas fases (después de 2026-07-22):
 
 ### 1. Conectar los exportes de nómina a la BD real ⭐ (mayor valor, ~medio día)
 Los endpoints `GET /payroll/:periodo/export/plame` y `/export/telecredito` hoy retornan un stub `{mensaje}`. Los servicios `PlanillaExporter` (Estructura 18) y `BankFileExporter` (BCP) ya existen y están testeados — falta el cableado:
@@ -61,6 +83,12 @@ Dashboard del ciclo con advertencias antes de procesar: trabajadores sin cuenta 
 - [ ] Pre-poblar Ficha de Alta al contratar
 
 ### Técnico / Deuda
+
+#### Sprint 7 Identificada
+- [ ] **P2002 edge case:** Schema constraint `@@unique([tenantId, employeeId, fechaActual])` sin filtro de estado. Re-requests después de RECHAZADA/APROBADA pasarán validación de servicio pero fallarán en DB. Solución: catch Prisma P2002 + translate a ConflictException, o ajustar constraint a `@@unique([..., estado])`. Priority: LOW (edge case raro). Task 3 flagged, puede addressed en Task 6-9 o follow-up.
+- [ ] **Notificaciones Task 7:** Métodos `notificarSolicitudAprobada` y `notificarSolicitudRechazada` agregados a NotificationService en Task 3 (nominalmente Task 7 scope). Revisar scope creep; probablemente OK ya que fueron necesarios para Task 3 integration.
+
+#### Sprint 6+ Existente
 - [ ] Tests de frontend (no existe infraestructura; hoy la barra es tsc + next build)
 - [ ] UI para cambiar de rol activo cuando un usuario tiene varios (deuda declarada en Fase 0)
 - [ ] Job de retención de documentos (hard-delete a 90 días, Ley 29733)

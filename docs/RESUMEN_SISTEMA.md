@@ -2,7 +2,7 @@
 
 Sistema de Gestión de Recursos Humanos (HRMS) para empresas peruanas, multi-empresa (multi-tenant) y con cumplimiento estricto de la normativa local (SUNAT, SUNAFIL, MTPE, Ley 29733).
 
-**Estado:** Backend Fases 0–4 + módulo de cese y liquidación · 246 tests unitarios (31 suites) · Frontend completo (10 páginas) · Import/export CSV para sistemas externos
+**Estado:** Backend Fases 0–5 + módulo de cese y liquidación · 284 tests unitarios (35 suites) · Frontend completo (11 páginas) · Import/export CSV para sistemas externos
 
 **Repositorio:** https://github.com/edwinabb/rrhh
 
@@ -19,6 +19,7 @@ Frontend completo con shell autenticado: sidebar de navegación **filtrado por l
 | **Asistencia** | `/asistencia` | Marcar ENTRADA/SALIDA con GPS del navegador (validación de geofence visible), resumen mensual, justificaciones con aprobación gerencial, dashboard de equipo, **import CSV desde sistema biométrico externo**. |
 | **Nómina** | `/nomina` | Procesar planilla del período (con confirmación), exportes PLAME/telecrédito, **import CSV de novedades del período** (días, horas extra, bonos, descuentos). |
 | **Vacaciones** | `/vacaciones` | Récord vacacional por empleado: períodos con días ganados/gozados/pendientes, registro de goce, alerta de riesgo de indemnización (art. 23 D.Leg. 713). |
+| **Turnos** | `/turnos` | Catálogo de turnos (horarios), plan de asignaciones semanales (importable/editable), libro de movimientos compensatorios (intercambios, ganancias, cruces con justificación) y flujo de resolución de inconsistencias (marcación vs. plan). |
 | **Liquidaciones** | `/liquidaciones` | Ceses y liquidaciones: wizard de 3 pasos (crear → revisar snapshot → calcular), desglose por concepto con base legal, semáforo del plazo de 48h, aprobar/pagar/anular según permisos. |
 | **Legajo** | `/legajo` | Documentos por empleado agrupados por tipo (faltantes destacados), subida, descarga, eliminación con motivo (soft-delete), búsqueda. |
 | **Reclutamiento** | `/ats` y `/ats/[id]` | Vacantes con estados, registro de candidatos con consentimiento LPDP obligatorio, CV parseado con Claude API, pipeline de estados validado, notas internas, contratación. |
@@ -89,6 +90,67 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | `POST /ats/candidatos/:id/notas` | `ats.manage` | Notas internas de RRHH sobre el candidato. |
 | `PUT /ats/candidatos/:id/contratar` | `ats.manage` | OFERTA → CONTRATADO y vincula al candidato con su registro `Employee` (migración formal según D.Leg. 728). |
 
+### Turnos (Fase 5 — feature-complete)
+
+| Endpoint | Permiso | Qué hace |
+|----------|---------|----------|
+| `GET /turnos` | `shift.read` | Lista todos los turnos del tenant: nombre, horario inicio/fin, duración, tolerancia. |
+| `POST /turnos` | `shift.manage` | Crea un nuevo turno (catálogo): nombre único, hora inicio/fin, duración total, tolerancia de entrada (minutos). |
+| `PUT /turnos/:id` | `shift.manage` | Actualiza catálogo de turno (nombre, horario, tolerancia). No afecta asignaciones existentes. |
+| `GET /turno-asignaciones?periodo=YYYY-MM` | `shift.read` | Plan semanal: quién está asignado a qué turno cada día. Manager ve su equipo; RRHH ve toda la empresa; Employee solo su plan. |
+| `POST /turno-asignaciones/import` | `shift.manage` | Importa plan desde CSV (empleado, fecha, turno) usando upsert — re-importar actualiza. Retorna `{procesadas, omitidas, errores[{fila, mensaje}]}`. |
+| `PUT /turno-asignaciones/:id` | `shift.manage` | Edita la asignación de un día (cambiar turno, cancelar). Dispara recálculo de horas extra si es turno de noche. |
+| `GET /compensatorio-movimientos?periodo=YYYY-MM` | `shift.read` | Libro de cambios: intercambios (empleado X cubre Y en fecha Z), ganancias (se le debe un día al empleado) y cruces (marcación diferente al plan). Resueltos (APROBADO, RECHAZADO) e irresueltos (PENDIENTE). |
+| `POST /compensatorio-movimientos/:id/resolver` | `shift.manage` | RRHH registra resultado: si es diferencia marcación vs. plan (cruce), categoriza como intercambio/ganancia/error. Calcula deuda o crédito y lo reserva en tabla `CompensatorioSaldo`. |
+| `GET /compensatorio-movimientos/saldo/:employeeId` | `shift.read` | Saldo actual del empleado: días que se le deben vs. días que debe. |
+| `PUT /compensatorio-movimientos/:id/marcar-goce` | `shift.manage` | En la vista del plan, marcar una celda como "DC" (día compensatorio) para que el empleado goce un día adeudado. Valida saldo > 0. |
+
+**Cálculo de horas y tolerancia:**
+- Turno ENTRADA hasta SALIDA, diferencia es base de horas
+- Si la entrada está dentro de la tolerancia configurada, cero tardanza
+- Horas extra: si las horas totales > jornada estándar (8h/48h), recargo 25%/35% (D.Leg. 854)
+- Turno nocturno (salida al día siguiente): fecha del resumen es del INICIO (lunes noche → resumen lunes, marcación hasta martes 08:00)
+
+**Flujo de resolución:**
+1. Sistema detecta diferencia: marcación muestra entrada 20:31 pero plan es 20:00 → CRUCE
+2. RRHH revisa, elige categoría: intercambio (X cubrió), ganancia (se le debe), error (justificante)
+3. Si ganancia: crea asiento en libro con saldo; empleado puede goce posterior (marcar DC)
+
+### Turnos (Fases 6-9 — Autoservicio + Gestión Avanzada)
+
+**4 features independientes con tabs dedicados en la UI `/turnos`. Especificación: `docs/superpowers/specs/2026-07-18-turnos-mejoras-phase-6-9.md`. Plan: `docs/superpowers/plans/2026-07-18-turnos-mejoras-phase-6-9.md`**
+
+| # | Feature | Usuario | Endpoint | Permiso | Descripción |
+|---|---------|---------|----------|---------|-------------|
+| 1 | **Patrones de Rotación** | Manager | `POST /turnos/patrones` | `shift.manage` | Define patrón recurrente (ej: 2 DIA + 2 NOCHE + 2 DESC + 1 DESC); inyecta masivamente al plan de múltiples empleados. |
+| | | | `GET /turnos/patrones` | `shift.read` | Lista patrones activos. |
+| | | | `PUT /turnos/patrones/:id` | `shift.manage` | Edita patrón (nombre, secuencia). |
+| | | | `POST /turnos/patrones/:id/aplicar` | `shift.manage` | Aplica patrón: multi-select empleados, rango fechas, preview, inyecta masivo con upsert. |
+| 2 | **Cambios de Turno** | Empleado | `POST /turnos/cambios/solicitar` | `shift.read` | Empleado solicita cambiar turno en fecha específica (reemplazo + motivo); queda PENDIENTE. |
+| | | Manager | `GET /turnos/cambios` | `shift.manage` | Manager revisa solicitudes (PENDIENTE/APROBADA/RECHAZADA). |
+| | | | `PUT /turnos/cambios/:id/aprobar` | `shift.manage` | Aprueba cambio; actualiza asignación. |
+| | | | `PUT /turnos/cambios/:id/rechazar` | `shift.manage` | Rechaza con motivo; empleado puede reintentar. |
+| 3 | **Validación de Horas Extra / Trabajo Fuera de Turno** | Empleado/Manager | `POST /turnos/reportes-trabajo-extra` | `shift.read` | Empleado reporta trabajo fuera de turno: tarea, fecha, horas, fotos (con timestamp). Queda PENDIENTE_VALIDACION. |
+| | | Director/RRHH | `GET /turnos/reportes-trabajo-extra` | `shift.manage` | Listar reportes (filtrable por estado: PENDIENTE_VALIDACION, APROBADO, RECHAZADO). |
+| | | | `POST /turnos/reportes-trabajo-extra/:id/validar` | `shift.resolve` | Director/RRHH valida: inspecciona fotos/descripción, genera compensatorio (DESCANSO_COMPENSATORIO o PAGO_EXTRA según contrato). |
+| | | | `PUT /turnos/reportes-trabajo-extra/:id/rechazar` | `shift.resolve` | Rechaza; empleado puede reintentar (loop infinito hasta validación). |
+| 4 | **Portal de Intercambios** | Empleado | `POST /turnos/intercambios/proponer` | `shift.read` | Empleado A propone intercambiar turno en fecha X con empleado B. Queda PENDIENTE_B. |
+| | | | `GET /turnos/intercambios` | `shift.read` | Mi bandeja de intercambios (propuestos por mí, asignados a mí, resueltos). |
+| | | | `PUT /turnos/intercambios/:id/aceptar` | `shift.read` | Empleado B acepta; Manager recibe notificación para aprobación. |
+| | | | `PUT /turnos/intercambios/:id/rechazar` | `shift.read` | Empleado B rechaza; se cierra sin cambios. |
+| | | Manager | `GET /turnos/intercambios/pendientes-manager` | `shift.manage` | Manager aprueba/rechaza intercambios aceptados. |
+| | | | `PUT /turnos/intercambios/:id/aprobar` | `shift.manage` | Ejecuta swap de asignaciones en plan (neutral para compensatorios). |
+| | | | `PUT /turnos/intercambios/:id/rechazar` | `shift.manage` | Rechaza swap; se revierte propuesta. |
+
+**Principios de diseño (Fases 6-9):**
+- Cada feature es **independiente**: ciclo de vida separado, permisos RBAC distintos, implementación en sprints paralelos (Sprint 6, 7, 8, 9).
+- **Datos privados:** Feature 3 solo muestra `horasAcumuladas`, `causaHorasExtras`, `saldoCompensatorios` a Manager/Director (no visible a Empleado).
+- **Intercambios neutrales:** Feature 4 no genera movimientos compensatorios (swap puro: X cubre Y en fecha Z, Y cubre X en fecha W).
+- **Fotos con timestamp:** Feature 3 requiere que el timestamp esté **visible en la imagen** (no solo metadata), capturado por navegador/cámara.
+- **Reporte rechazado = reentrega:** Feature 3 permite loop infinito de correcciones hasta VALIDADA.
+- **Notificaciones por cambio de estado:** Email + in-app en cada transición (pendiente/aprobada/rechazada/validada).
+- **Auditoría completa:** quién, cuándo, decisión, motivo (si aplica).
+
 ### Cese y Liquidación
 
 | Endpoint | Permiso | Qué hace |
@@ -115,6 +177,9 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Procesar/exportar nómina | ✓ | ✓ | ✗ | ✗ |
 | Ver récord vacacional | ✓ | ✓ | ✓ | ✗ |
 | Gestionar récord vacacional | ✓ | ✓ | ✗ | ✗ |
+| Ver catálogo y plan de turnos | ✓ | ✓ | ✓ | ✓ |
+| Gestionar catálogo y plan de turnos | ✓ | ✓ | ✗ | ✗ |
+| Resolver diferencias (turnos) | ✓ | ✓ | ✗ | ✗ |
 | Registrar ceses y calcular liquidaciones | ✓ | ✓ | ✗ | ✗ |
 | Aprobar/pagar/anular liquidaciones | ✓ | ✗ | ✗ | ✗ |
 | Marcar asistencia / justificar | ✓ | ✓ | ✓ | ✓ |
@@ -122,7 +187,7 @@ Toda la API requiere sesión (cookie) excepto el login, y cada endpoint valida u
 | Subir documentos | ✓ | ✓ | ✗ | ✗ |
 | Eliminar documentos | ✓ | ✗ | ✗ | ✗ |
 | Gestionar vacantes/candidatos | ✓ | ✓ | ✗ | ✗ |
-| Importar CSV (asistencia/novedades) | ✓ | ✓ | ✗ | ✗ |
+| Importar CSV (asistencia/novedades/turnos) | ✓ | ✓ | ✗ | ✗ |
 | Parámetros normativos (escribir) | ✓ | ✗ | ✗ | ✗ |
 
 ---
