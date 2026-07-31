@@ -43,6 +43,9 @@ model Tenant {
   rotacionPatrones         RotacionPatron[]
   solicitudesCambioTurno   SolicitudCambioTurno[]
 
+  // Fase 8 — Trabajo fuera de turno
+  solicitudesTrabajoAdicional SolicitudTrabajoAdicional[]
+
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
   geofences               Geofence[]
@@ -187,6 +190,10 @@ model Employee {
   turnoAsignaciones        TurnoAsignacion[]
   compensatorioMovimientos CompensatorioMovimiento[]
   solicitudesCambioTurno   SolicitudCambioTurno[]
+
+  // Fase 8 — Trabajo fuera de turno
+  solicitudesTrabajoAdicionalSolicitante SolicitudTrabajoAdicional[] @relation("SolicitudTrabajoAdicionalSolicitante")
+  solicitudesTrabajoAdicionalAsignado    SolicitudTrabajoAdicional[] @relation("SolicitudTrabajoAdicionalAsignado")
 
   // Fase 2 — Asistencia
   marcaciones         Marcacion[]
@@ -828,6 +835,73 @@ model SolicitudCambioTurno {
   @@index([tenantId, employeeId])
   @@index([decididoPor])
   @@map("solicitud_cambio_turno")
+}
+
+enum UrgenciaTrabajoAdicional {
+  NORMAL
+  URGENTE
+
+  @@map("urgencia_trabajo_adicional")
+}
+
+enum EstadoSolicitudTrabajoAdicional {
+  PENDIENTE_APROBACION
+  APROBADA
+  REASIGNADA
+  RECHAZADA
+  REPORTE_PENDIENTE_VALIDACION
+  REPORTE_RECHAZADO
+  VALIDADA
+
+  @@map("estado_solicitud_trabajo_adicional")
+}
+
+// Solicitud de trabajo adicional fuera de turno: empleado propone realizar
+// tareas fuera de su turno asignado con compensación. Requiere aprobación de
+// manager/RRHH/Admin (flujo PENDIENTE_APROBACION → APROBADA/RECHAZADA/REASIGNADA),
+// seguido opcionalmente de un reporte de ejecución (REPORTE_PENDIENTE_VALIDACION →
+// REPORTE_RECHAZADO/VALIDADA).
+model SolicitudTrabajoAdicional {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId                String   @map("tenant_id") @db.Uuid
+  employeeIdSolicitante   String   @map("employee_id_solicitante") @db.Uuid
+  employeeIdAsignado      String   @map("employee_id_asignado") @db.Uuid // puede cambiar si es REASIGNADA
+  descripcionTarea        String   @map("descripcion_tarea")
+  fechaEstimada           DateTime @map("fecha_estimada") @db.Date
+  horasEstimadas          Decimal  @map("horas_estimadas") @db.Decimal(4, 2) // > 0 && <= 12
+  urgencia                UrgenciaTrabajoAdicional
+
+  // Indicadores privados (solo visible para manager)
+  causaHorasExtras        Boolean? @map("causa_horas_extras")
+  horasAcumuladas         Decimal? @map("horas_acumuladas") @db.Decimal(5, 2)
+  saldoCompensatorios     Decimal? @map("saldo_compensatorios") @db.Decimal(5, 2)
+
+  estado                  EstadoSolicitudTrabajoAdicional @default(PENDIENTE_APROBACION)
+
+  // Decisión de aprobación/rechazo
+  managerId               String?  @map("manager_id") @db.Uuid
+  motivoRechazo           String?  @map("motivo_rechazo") @db.Text
+
+  // Reporte de ejecución
+  reporteDescripcion      String?  @map("reporte_descripcion")
+  reporteFotos            String[] @map("reporte_fotos") // text array: URLs
+  reporteNotas            String?  @map("reporte_notas")
+  reporteEnviadoEn        DateTime? @map("reporte_enviado_en")
+
+  // Auditoría
+  creadoEn                DateTime @default(now()) @map("creado_en")
+  creadoPor               String   @map("creado_por") @db.Uuid
+  actualizadoEn           DateTime @updatedAt @map("actualizado_en")
+  actualizadoPor          String?  @map("actualizado_por") @db.Uuid
+
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  solicitante             Employee @relation("SolicitudTrabajoAdicionalSolicitante", fields: [employeeIdSolicitante], references: [id], onDelete: Cascade)
+  asignado                Employee @relation("SolicitudTrabajoAdicionalAsignado", fields: [employeeIdAsignado], references: [id])
+
+  @@index([tenantId, employeeIdSolicitante])
+  @@index([tenantId, employeeIdAsignado])
+  @@index([tenantId, estado])
+  @@map("solicitud_trabajo_adicional")
 }
 
 enum TipoMovimientoCompensatorio {
