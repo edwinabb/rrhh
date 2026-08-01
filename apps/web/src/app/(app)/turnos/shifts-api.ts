@@ -255,3 +255,66 @@ export const rechazarCambio = async (id: string, decididoPor: string, motivoRech
     await apiFetch(`/turnos/cambios/${id}/rechazar`, { method: 'PUT', body: JSON.stringify({ decididoPor, motivoRechazo }) }),
     'rechazar el cambio',
   );
+
+// ---------------------------------------------------------------------------
+// Trabajo Fuera de Turno (Trabajo Adicional)
+// ---------------------------------------------------------------------------
+
+export type EstadoTrabajoAdicional =
+  | 'PENDIENTE_APROBACION'
+  | 'APROBADA'
+  | 'REASIGNADA'
+  | 'RECHAZADA'
+  | 'REPORTE_PENDIENTE_VALIDACION'
+  | 'REPORTE_RECHAZADO'
+  | 'VALIDADA';
+
+export interface SolicitudTrabajoAdicional {
+  id: string;
+  tenantId: string;
+  employeeIdSolicitante: string;
+  employeeIdAsignado: string;
+  descripcionTarea: string;
+  fechaEstimada: string;
+  horasEstimadas: string | number;
+  urgencia: 'NORMAL' | 'URGENTE';
+  causaHorasExtras?: boolean;
+  horasAcumuladas?: string | number;
+  saldoCompensatorios?: string | number;
+  estado: EstadoTrabajoAdicional;
+  managerId?: string | null;
+  motivoRechazo?: string | null;
+  reporteDescripcion?: string | null;
+  reporteFotos: string[];
+  reporteNotas?: string | null;
+  reporteEnviadoEn?: string | null;
+  creadoEn: string;
+  creadoPor: string;
+  actualizadoEn: string;
+  actualizadoPor?: string | null;
+}
+
+export async function solicitarTrabajoAdicional(input: {
+  descripcionTarea: string;
+  fechaEstimada: string;
+  horasEstimadas: number;
+  urgencia: 'NORMAL' | 'URGENTE';
+}): Promise<SolicitudTrabajoAdicional> {
+  return ok(
+    await apiFetch('/turnos/trabajo-adicional/solicitar', { method: 'POST', body: JSON.stringify(input) }),
+    'solicitar el trabajo adicional',
+  );
+}
+
+export const listarMisTrabajos = async (): Promise<SolicitudTrabajoAdicional[]> =>
+  ok(await apiFetch('/turnos/trabajo-adicional/mis-solicitudes'), 'listar mis trabajos');
+
+export async function enviarReporteTrabajo(
+  id: string,
+  input: { reporteDescripcion: string; reporteFotos: string[]; reporteNotas?: string },
+): Promise<SolicitudTrabajoAdicional> {
+  return ok(
+    await apiFetch(`/turnos/trabajo-adicional/${id}/reporte`, { method: 'POST', body: JSON.stringify(input) }),
+    'enviar el reporte',
+  );
+}
