@@ -66,6 +66,9 @@ describe('ShiftsController - Cambios de Turno', () => {
       {} as any, // rotacionAplicador
       mockSolicitudCambioTurnoService,
       mockSolicitudCambioTurnoAplicadorService,
+      {} as any, // solicitudTrabajoAdicional
+      {} as any, // solicitudTrabajoAdicionalAplicador
+      {} as any, // notificacion
     );
 
     mockTenantContext = {
@@ -428,6 +431,9 @@ describe('ShiftsController - Patrones', () => {
       mockRotacionAplicadorService,
       {} as any, // solicitudCambioTurno
       {} as any, // solicitudCambioTurnoAplicador
+      {} as any, // solicitudTrabajoAdicional
+      {} as any, // solicitudTrabajoAdicionalAplicador
+      {} as any, // notificacion
     );
 
     mockTenantContext = {
@@ -797,6 +803,407 @@ describe('ShiftsController - Patrones', () => {
           diaInicioCiclo: '2026-08-04',
         })
       ).rejects.toThrow('Request sin tenant o usuario resuelto');
+    });
+  });
+});
+
+describe('ShiftsController - Trabajo Fuera de Turno', () => {
+  let controller: ShiftsController;
+  let mockSolicitudTrabajoAdicionalService: any;
+  let mockSolicitudTrabajoAdicionalAplicadorService: any;
+  let mockNotificationService: any;
+  let mockRequest: any;
+  let mockManagerRequest: any;
+
+  beforeEach(() => {
+    mockSolicitudTrabajoAdicionalService = {
+      crearSolicitud: jest.fn(),
+      listarSolicitudes: jest.fn(),
+      listarMisSolicitudes: jest.fn(),
+      obtenerSolicitud: jest.fn(),
+      enviarReporte: jest.fn(),
+    };
+    mockSolicitudTrabajoAdicionalAplicadorService = {
+      aprobarSolicitud: jest.fn(),
+      reasignarSolicitud: jest.fn(),
+      rechazarSolicitud: jest.fn(),
+      validarReporte: jest.fn(),
+      rechazarReporte: jest.fn(),
+    };
+    mockNotificationService = {
+      notificarSolicitudTrabajoCreada: jest.fn().mockResolvedValue(undefined),
+      notificarReporteEnviado: jest.fn().mockResolvedValue(undefined),
+    };
+
+    mockManagerRequest = { session: { permissions: ['shift.manage'] } };
+    mockRequest = { session: { permissions: ['shift.read'] } };
+
+    controller = new ShiftsController(
+      {} as any, // shiftPlan
+      {} as any, // planImport
+      {} as any, // compensatorios
+      {} as any, // compliance
+      {} as any, // rotacionPatron
+      {} as any, // rotacionAplicador
+      {} as any, // solicitudCambioTurno
+      {} as any, // solicitudCambioTurnoAplicador
+      mockSolicitudTrabajoAdicionalService,
+      mockSolicitudTrabajoAdicionalAplicadorService,
+      mockNotificationService,
+    );
+
+    mockTenantContext = {
+      tenantId: 't-1',
+      userId: 'u-1',
+      tx: mockTx({
+        employee: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'emp-1' }),
+        },
+      }),
+    };
+  });
+
+  describe('POST /turnos/trabajo-adicional/solicitar', () => {
+    it('creates a work-outside-shift request and notifies manager', async () => {
+      const dto = {
+        descripcionTarea: 'Reparar equipo',
+        fechaEstimada: '2026-08-15',
+        horasEstimadas: 4,
+        urgencia: 'NORMAL',
+      };
+      const mockResult = {
+        id: 'sta-1',
+        estado: 'PENDIENTE_APROBACION',
+        causaHorasExtras: false,
+        horasAcumuladas: 4,
+        saldoCompensatorios: 0,
+      };
+      mockSolicitudTrabajoAdicionalService.crearSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.solicitarTrabajoAdicional(mockManagerRequest, dto);
+
+      expect(mockSolicitudTrabajoAdicionalService.crearSolicitud).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        expect.objectContaining({
+          tenantId: 't-1',
+          employeeIdSolicitante: 'emp-1',
+          employeeIdAsignado: 'emp-1',
+          descripcionTarea: 'Reparar equipo',
+          horasEstimadas: 4,
+          urgencia: 'NORMAL',
+          creadoPor: 'u-1',
+        })
+      );
+      expect(mockNotificationService.notificarSolicitudTrabajoCreada).toHaveBeenCalled();
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('rejects without descripcionTarea', async () => {
+      const dto = { fechaEstimada: '2026-08-15', horasEstimadas: 4, urgencia: 'NORMAL' };
+
+      await expect(controller.solicitarTrabajoAdicional(mockRequest, dto)).rejects.toThrow(
+        'descripcionTarea, fechaEstimada, horasEstimadas y urgencia son obligatorios'
+      );
+    });
+
+    it('throws when employee not found', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+      const dto = {
+        descripcionTarea: 'Reparar equipo',
+        fechaEstimada: '2026-08-15',
+        horasEstimadas: 4,
+        urgencia: 'NORMAL',
+      };
+
+      await expect(controller.solicitarTrabajoAdicional(mockRequest, dto)).rejects.toThrow(
+        'La sesión no tiene un empleado asociado'
+      );
+    });
+
+    it('removes private fields for non-managers', async () => {
+      const dto = {
+        descripcionTarea: 'Reparar equipo',
+        fechaEstimada: '2026-08-15',
+        horasEstimadas: 4,
+        urgencia: 'NORMAL',
+      };
+      mockSolicitudTrabajoAdicionalService.crearSolicitud.mockResolvedValue({
+        id: 'sta-1',
+        causaHorasExtras: true,
+        horasAcumuladas: 50,
+        saldoCompensatorios: 2,
+      });
+
+      const resultado = await controller.solicitarTrabajoAdicional(mockRequest, dto);
+
+      expect(resultado).not.toHaveProperty('causaHorasExtras');
+      expect(resultado).not.toHaveProperty('horasAcumuladas');
+      expect(resultado).not.toHaveProperty('saldoCompensatorios');
+    });
+  });
+
+  describe('GET /turnos/trabajo-adicional/mis-solicitudes', () => {
+    it('returns own requests', async () => {
+      const mockSolicitudes = [{ id: 'sta-1', employeeIdSolicitante: 'emp-1' }];
+      mockSolicitudTrabajoAdicionalService.listarMisSolicitudes.mockResolvedValue(mockSolicitudes);
+
+      const resultado = await controller.listarMisSolicitudesTrabajoAdicional(mockRequest);
+
+      expect(mockSolicitudTrabajoAdicionalService.listarMisSolicitudes).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        't-1',
+        'emp-1'
+      );
+      expect(resultado).toEqual(mockSolicitudes);
+    });
+
+    it('throws when employee not found', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
+      await expect(controller.listarMisSolicitudesTrabajoAdicional(mockRequest)).rejects.toThrow(
+        'La sesión no tiene un empleado asociado'
+      );
+    });
+  });
+
+  describe('GET /turnos/trabajo-adicional/pendientes', () => {
+    it('lists pending requests with fixed estado filter', async () => {
+      const mockSolicitudes = [{ id: 'sta-1', estado: 'PENDIENTE_APROBACION' }];
+      mockSolicitudTrabajoAdicionalService.listarSolicitudes.mockResolvedValue(mockSolicitudes);
+
+      const resultado = await controller.listarTrabajoAdicionalPendientes(mockManagerRequest);
+
+      expect(mockSolicitudTrabajoAdicionalService.listarSolicitudes).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        expect.objectContaining({ tenantId: 't-1', estado: 'PENDIENTE_APROBACION' })
+      );
+      expect(resultado).toEqual(mockSolicitudes);
+    });
+
+    it('applies optional filters', async () => {
+      mockSolicitudTrabajoAdicionalService.listarSolicitudes.mockResolvedValue([]);
+
+      await controller.listarTrabajoAdicionalPendientes(
+        mockManagerRequest, 'emp-2', '2026-08-01', '2026-08-31',
+      );
+
+      expect(mockSolicitudTrabajoAdicionalService.listarSolicitudes).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        expect.objectContaining({
+          employeeId: 'emp-2',
+          fechaDesde: expect.any(Date),
+          fechaHasta: expect.any(Date),
+        })
+      );
+    });
+  });
+
+  describe('GET /turnos/trabajo-adicional/validar', () => {
+    it('lists requests pending validation with fixed estado filter', async () => {
+      const mockSolicitudes = [{ id: 'sta-1', estado: 'REPORTE_PENDIENTE_VALIDACION' }];
+      mockSolicitudTrabajoAdicionalService.listarSolicitudes.mockResolvedValue(mockSolicitudes);
+
+      const resultado = await controller.listarTrabajoAdicionalParaValidar(mockManagerRequest);
+
+      expect(mockSolicitudTrabajoAdicionalService.listarSolicitudes).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        expect.objectContaining({ tenantId: 't-1', estado: 'REPORTE_PENDIENTE_VALIDACION' })
+      );
+      expect(resultado).toEqual(mockSolicitudes);
+    });
+  });
+
+  describe('PUT /turnos/trabajo-adicional/:id/aprobar', () => {
+    it('approves a request', async () => {
+      const dto = { managerId: 'mgr-1' };
+      const mockResult = { id: 'sta-1', estado: 'APROBADA' };
+      mockSolicitudTrabajoAdicionalAplicadorService.aprobarSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.aprobarTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+
+      expect(mockSolicitudTrabajoAdicionalAplicadorService.aprobarSolicitud).toHaveBeenCalledWith(
+        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1',
+      );
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('rejects without managerId', async () => {
+      await expect(
+        controller.aprobarTrabajoAdicional(mockManagerRequest, 'sta-1', {})
+      ).rejects.toThrow('managerId es obligatorio');
+    });
+  });
+
+  describe('PUT /turnos/trabajo-adicional/:id/reasignar', () => {
+    it('reassigns a request', async () => {
+      const dto = { managerId: 'mgr-1', employeeIdNuevo: 'emp-2' };
+      const mockResult = { id: 'sta-1', estado: 'REASIGNADA', employeeIdAsignado: 'emp-2' };
+      mockSolicitudTrabajoAdicionalAplicadorService.reasignarSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+
+      expect(mockSolicitudTrabajoAdicionalAplicadorService.reasignarSolicitud).toHaveBeenCalledWith(
+        mockTenantContext.tx, 't-1', 'sta-1', 'emp-2', 'mgr-1',
+      );
+      expect(resultado).toEqual(mockResult);
+      expect(resultado).not.toHaveProperty('emailEnviado');
+    });
+
+    it('rejects without employeeIdNuevo', async () => {
+      await expect(
+        controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', { managerId: 'mgr-1' })
+      ).rejects.toThrow('managerId y employeeIdNuevo son obligatorios');
+    });
+
+    it('rejects without managerId', async () => {
+      await expect(
+        controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', { employeeIdNuevo: 'emp-2' })
+      ).rejects.toThrow('managerId y employeeIdNuevo son obligatorios');
+    });
+  });
+
+  describe('PUT /turnos/trabajo-adicional/:id/rechazar', () => {
+    it('rejects a request', async () => {
+      const dto = { managerId: 'mgr-1', motivoRechazo: 'No procede' };
+      const mockResult = { id: 'sta-1', estado: 'RECHAZADA', motivoRechazo: 'No procede' };
+      mockSolicitudTrabajoAdicionalAplicadorService.rechazarSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.rechazarTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+
+      expect(mockSolicitudTrabajoAdicionalAplicadorService.rechazarSolicitud).toHaveBeenCalledWith(
+        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1', 'No procede',
+      );
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('rejects without managerId', async () => {
+      await expect(
+        controller.rechazarTrabajoAdicional(mockManagerRequest, 'sta-1', { motivoRechazo: 'X' })
+      ).rejects.toThrow('managerId es obligatorio');
+    });
+  });
+
+  describe('GET /turnos/trabajo-adicional/:id', () => {
+    it('returns a request by id', async () => {
+      const mockResult = { id: 'sta-1', estado: 'PENDIENTE_APROBACION' };
+      mockSolicitudTrabajoAdicionalService.obtenerSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.obtenerTrabajoAdicional(mockManagerRequest, 'sta-1');
+
+      expect(mockSolicitudTrabajoAdicionalService.obtenerSolicitud).toHaveBeenCalledWith(
+        mockTenantContext.tx, 'sta-1',
+      );
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('throws NotFoundException when missing', async () => {
+      mockSolicitudTrabajoAdicionalService.obtenerSolicitud.mockResolvedValue(null);
+
+      await expect(
+        controller.obtenerTrabajoAdicional(mockManagerRequest, 'sta-999')
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('POST /turnos/trabajo-adicional/:id/reporte', () => {
+    it('submits a report and notifies the manager', async () => {
+      const dto = { reporteDescripcion: 'Listo', reporteFotos: ['a.jpg', 'b.jpg'] };
+      const mockResult = {
+        id: 'sta-1',
+        estado: 'REPORTE_PENDIENTE_VALIDACION',
+        managerId: 'mgr-1',
+        descripcionTarea: 'Reparar equipo',
+        fechaEstimada: new Date('2026-08-15'),
+      };
+      mockSolicitudTrabajoAdicionalService.enviarReporte.mockResolvedValue(mockResult);
+
+      const resultado = await controller.enviarReporteTrabajoAdicional(mockRequest, 'sta-1', dto);
+
+      expect(mockSolicitudTrabajoAdicionalService.enviarReporte).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        expect.objectContaining({
+          tenantId: 't-1',
+          id: 'sta-1',
+          employeeId: 'emp-1',
+          reporteDescripcion: 'Listo',
+          reporteFotos: ['a.jpg', 'b.jpg'],
+        })
+      );
+      expect(mockNotificationService.notificarReporteEnviado).toHaveBeenCalledWith(
+        't-1', 'mgr-1', 'Reparar equipo', mockResult.fechaEstimada,
+      );
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('skips notification when managerId is null', async () => {
+      const dto = { reporteDescripcion: 'Listo', reporteFotos: ['a.jpg', 'b.jpg'] };
+      mockSolicitudTrabajoAdicionalService.enviarReporte.mockResolvedValue({
+        id: 'sta-1',
+        managerId: null,
+      });
+
+      await controller.enviarReporteTrabajoAdicional(mockRequest, 'sta-1', dto);
+
+      expect(mockNotificationService.notificarReporteEnviado).not.toHaveBeenCalled();
+    });
+
+    it('rejects without reporteDescripcion', async () => {
+      await expect(
+        controller.enviarReporteTrabajoAdicional(mockRequest, 'sta-1', { reporteFotos: ['a.jpg', 'b.jpg'] })
+      ).rejects.toThrow('reporteDescripcion y reporteFotos son obligatorios');
+    });
+
+    it('throws when employee not found', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
+      await expect(
+        controller.enviarReporteTrabajoAdicional(mockRequest, 'sta-1', {
+          reporteDescripcion: 'Listo',
+          reporteFotos: ['a.jpg', 'b.jpg'],
+        })
+      ).rejects.toThrow('La sesión no tiene un empleado asociado');
+    });
+  });
+
+  describe('PUT /turnos/trabajo-adicional/:id/validar', () => {
+    it('validates a report', async () => {
+      const dto = { managerId: 'mgr-1' };
+      const mockResult = { id: 'sta-1', estado: 'VALIDADA' };
+      mockSolicitudTrabajoAdicionalAplicadorService.validarReporte.mockResolvedValue(mockResult);
+
+      const resultado = await controller.validarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+
+      expect(mockSolicitudTrabajoAdicionalAplicadorService.validarReporte).toHaveBeenCalledWith(
+        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1',
+      );
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('rejects without managerId', async () => {
+      await expect(
+        controller.validarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', {})
+      ).rejects.toThrow('managerId es obligatorio');
+    });
+  });
+
+  describe('PUT /turnos/trabajo-adicional/:id/reporte-rechazar', () => {
+    it('rejects a report', async () => {
+      const dto = { managerId: 'mgr-1', motivo: 'Fotos insuficientes' };
+      const mockResult = { id: 'sta-1', estado: 'REPORTE_RECHAZADO', motivoRechazo: 'Fotos insuficientes' };
+      mockSolicitudTrabajoAdicionalAplicadorService.rechazarReporte.mockResolvedValue(mockResult);
+
+      const resultado = await controller.rechazarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+
+      expect(mockSolicitudTrabajoAdicionalAplicadorService.rechazarReporte).toHaveBeenCalledWith(
+        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1', 'Fotos insuficientes',
+      );
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('rejects without managerId', async () => {
+      await expect(
+        controller.rechazarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', { motivo: 'X' })
+      ).rejects.toThrow('managerId es obligatorio');
     });
   });
 });

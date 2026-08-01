@@ -319,6 +319,95 @@ export class NotificationService {
   }
 
   /**
+   * Notifica al manager del empleado solicitante que se creó una nueva
+   * solicitud de trabajo adicional. El manager se resuelve vía la
+   * auto-relación Employee.managerId del solicitante; si el solicitante no
+   * tiene manager asignado, se omite la notificación (no hay a quién
+   * notificar). No bloqueante: cualquier error se captura y se loguea.
+   */
+  async notificarSolicitudTrabajoCreada(
+    tenantId: string,
+    employeeIdSolicitante: string,
+    descripcionTarea: string,
+    fechaEstimada: Date,
+    horasEstimadas: number,
+    urgencia: string,
+  ): Promise<void> {
+    try {
+      const solicitante = await this.prisma.employee.findUnique({
+        where: { id: employeeIdSolicitante },
+        select: { managerId: true, nombres: true, apellidos: true },
+      });
+
+      if (!solicitante?.managerId) {
+        this.logger.warn(
+          `Empleado ${employeeIdSolicitante} no tiene manager asignado; se omite notificación de solicitud de trabajo adicional creada`,
+        );
+        return;
+      }
+
+      const nombreEmpleado = [solicitante.nombres, solicitante.apellidos].filter(Boolean).join(' ');
+      const mensaje = `${nombreEmpleado} solicita trabajo adicional para el ${fechaEstimada.toDateString()}: ${descripcionTarea}. Horas: ${horasEstimadas}. Urgencia: ${urgencia}.`;
+
+      const manager = await this.prisma.employee.findUnique({
+        where: { id: solicitante.managerId },
+        select: { user: { select: { email: true } } },
+      });
+
+      if (!manager?.user?.email) {
+        this.logger.warn(
+          `Manager ${solicitante.managerId} no tiene usuario/email asociado; se omite email de solicitud de trabajo adicional creada`,
+        );
+      } else {
+        await this.enviarEmail(manager.user.email, 'Nueva solicitud de trabajo adicional', mensaje);
+      }
+
+      await this.crearNotificacionInApp(tenantId, solicitante.managerId, mensaje);
+    } catch (e) {
+      this.logger.error(
+        `Error notificando a manager sobre solicitud de trabajo adicional creada por ${employeeIdSolicitante}: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * Notifica al manager que aprobó/reasignó el trabajo adicional que el
+   * empleado asignado entregó su reporte de ejecución. managerId es el
+   * Employee.id del manager, tomado directamente de la solicitud (no se
+   * resuelve vía auto-relación). No bloqueante: cualquier error se captura
+   * y se loguea.
+   */
+  async notificarReporteEnviado(
+    tenantId: string,
+    managerId: string,
+    descripcionTarea: string,
+    fechaEstimada: Date,
+  ): Promise<void> {
+    const mensaje = `Se entregó un reporte de trabajo adicional: ${descripcionTarea} (${fechaEstimada.toDateString()}).`;
+
+    try {
+      const manager = await this.prisma.employee.findUnique({
+        where: { id: managerId },
+        select: { id: true, user: { select: { email: true } } },
+      });
+
+      if (!manager?.user?.email) {
+        this.logger.warn(
+          `Manager ${managerId} no tiene usuario/email asociado; se omite notificación de reporte enviado`,
+        );
+      } else {
+        await this.enviarEmail(manager.user.email, 'Reporte de trabajo adicional entregado', mensaje);
+      }
+
+      await this.crearNotificacionInApp(tenantId, managerId, mensaje);
+    } catch (e) {
+      this.logger.error(
+        `Error notificando a manager ${managerId} sobre reporte enviado: ${(e as Error).message}`,
+      );
+    }
+  }
+
+  /**
    * Punto de entrada único de envío de email. Sin transporte real
    * configurado en el repo; se deja registrado vía Logger para no bloquear
    * el flujo de negocio. Reemplazar el cuerpo cuando se integre un

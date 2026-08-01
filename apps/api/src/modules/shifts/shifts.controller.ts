@@ -1,5 +1,6 @@
 import {
-  BadRequestException, Body, Controller, Get, Param, Post, Put, Query, UseGuards, Req,
+  BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put,
+  Query, UseGuards, Req,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
@@ -13,6 +14,9 @@ import { RotacionPatronService } from './rotacion-patron.service';
 import { RotacionAplicadorService } from './rotacion-aplicador.service';
 import { SolicitudCambioTurnoService } from './solicitud-cambio-turno.service';
 import { SolicitudCambioTurnoAplicadorService } from './solicitud-cambio-turno-aplicador.service';
+import { SolicitudTrabajoAdicionalService } from './solicitud-trabajo-adicional.service';
+import { SolicitudTrabajoAdicionalAplicadorService } from './solicitud-trabajo-adicional-aplicador.service';
+import { NotificationService } from '../../common/services/notification.service';
 
 const TIPOS_DIA: readonly TipoDiaPlan[] = ['TURNO', 'DESCANSO', 'DESCANSO_COMPENSATORIO'];
 const TIPOS_MOVIMIENTO: readonly TipoMovimientoCompensatorio[] = ['GANADO', 'AJUSTE_INICIAL'];
@@ -49,6 +53,9 @@ export class ShiftsController {
     private readonly rotacionAplicador: RotacionAplicadorService,
     private readonly solicitudCambioTurno: SolicitudCambioTurnoService,
     private readonly solicitudCambioTurnoAplicador: SolicitudCambioTurnoAplicadorService,
+    private readonly solicitudTrabajoAdicional: SolicitudTrabajoAdicionalService,
+    private readonly solicitudTrabajoAdicionalAplicador: SolicitudTrabajoAdicionalAplicadorService,
+    private readonly notificacion: NotificationService,
   ) {}
 
   private filtrarMotivoRechazoParaNoManagers(
@@ -71,6 +78,17 @@ export class ShiftsController {
       return solicitudes.map(filtrar);
     }
     return filtrar(solicitudes);
+  }
+
+  private filtrarCamposPrivadosTrabajoAdicional(solicitudes: any | any[], request: Request): any | any[] {
+    const permissions = (request.session as any)?.permissions ?? [];
+    const tienePermiso = permissions.includes('shift.manage');
+    if (tienePermiso) return solicitudes;
+    const filtrar = (s: any) => {
+      const { causaHorasExtras, horasAcumuladas, saldoCompensatorios, ...resto } = s;
+      return resto;
+    };
+    return Array.isArray(solicitudes) ? solicitudes.map(filtrar) : filtrar(solicitudes);
   }
 
   // --- Catálogo ---
@@ -387,5 +405,244 @@ export class ShiftsController {
       ajustes: dto.ajustes,
       creadoPor: userId,
     });
+  }
+
+  // --- Trabajo fuera de turno (fase 8) ---
+  @Post('trabajo-adicional/solicitar')
+  @RequirePermission('shift.read')
+  async solicitarTrabajoAdicional(@Req() request: Request, @Body() dto: any) {
+    if (!dto?.descripcionTarea || !dto?.fechaEstimada || dto?.horasEstimadas === undefined || !dto?.urgencia) {
+      throw new BadRequestException(
+        'descripcionTarea, fechaEstimada, horasEstimadas y urgencia son obligatorios',
+      );
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!employee) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    const fechaEstimada = parseFecha(dto.fechaEstimada, 'fechaEstimada');
+    const solicitud = await this.solicitudTrabajoAdicional.crearSolicitud(ctx.tx, {
+      tenantId,
+      employeeIdSolicitante: employee.id,
+      employeeIdAsignado: dto.employeeIdAsignado ?? employee.id,
+      descripcionTarea: dto.descripcionTarea,
+      fechaEstimada,
+      horasEstimadas: Number(dto.horasEstimadas),
+      urgencia: dto.urgencia,
+      creadoPor: userId,
+    });
+
+    try {
+      await this.notificacion.notificarSolicitudTrabajoCreada(
+        tenantId,
+        employee.id,
+        dto.descripcionTarea,
+        fechaEstimada,
+        Number(dto.horasEstimadas),
+        dto.urgencia,
+      );
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Get('trabajo-adicional/mis-solicitudes')
+  @RequirePermission('shift.read')
+  async listarMisSolicitudesTrabajoAdicional(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!employee) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    const solicitudes = await this.solicitudTrabajoAdicional.listarMisSolicitudes(
+      ctx.tx,
+      tenantId,
+      employee.id,
+    );
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitudes, request);
+  }
+
+  @Get('trabajo-adicional/pendientes')
+  @RequirePermission('shift.manage')
+  async listarTrabajoAdicionalPendientes(
+    @Req() request: Request,
+    @Query('employeeId') employeeId?: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+
+    const filtros: any = { tenantId, estado: 'PENDIENTE_APROBACION' };
+    if (employeeId) filtros.employeeId = employeeId;
+    if (fechaDesde) filtros.fechaDesde = parseFecha(fechaDesde, 'fechaDesde');
+    if (fechaHasta) filtros.fechaHasta = parseFecha(fechaHasta, 'fechaHasta');
+
+    const solicitudes = await this.solicitudTrabajoAdicional.listarSolicitudes(ctx.tx, filtros);
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitudes, request);
+  }
+
+  @Get('trabajo-adicional/validar')
+  @RequirePermission('shift.manage')
+  async listarTrabajoAdicionalParaValidar(
+    @Req() request: Request,
+    @Query('employeeId') employeeId?: string,
+    @Query('fechaDesde') fechaDesde?: string,
+    @Query('fechaHasta') fechaHasta?: string,
+  ) {
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+
+    const filtros: any = { tenantId, estado: 'REPORTE_PENDIENTE_VALIDACION' };
+    if (employeeId) filtros.employeeId = employeeId;
+    if (fechaDesde) filtros.fechaDesde = parseFecha(fechaDesde, 'fechaDesde');
+    if (fechaHasta) filtros.fechaHasta = parseFecha(fechaHasta, 'fechaHasta');
+
+    const solicitudes = await this.solicitudTrabajoAdicional.listarSolicitudes(ctx.tx, filtros);
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitudes, request);
+  }
+
+  @Put('trabajo-adicional/:id/aprobar')
+  @RequirePermission('shift.manage')
+  async aprobarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.managerId) {
+      throw new BadRequestException('managerId es obligatorio');
+    }
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    const solicitud = await this.solicitudTrabajoAdicionalAplicador.aprobarSolicitud(
+      ctx.tx,
+      tenantId,
+      id,
+      dto.managerId,
+    );
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Put('trabajo-adicional/:id/reasignar')
+  @RequirePermission('shift.manage')
+  async reasignarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.managerId || !dto?.employeeIdNuevo) {
+      throw new BadRequestException('managerId y employeeIdNuevo son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    const solicitud = await this.solicitudTrabajoAdicionalAplicador.reasignarSolicitud(
+      ctx.tx,
+      tenantId,
+      id,
+      dto.employeeIdNuevo,
+      dto.managerId,
+    );
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Put('trabajo-adicional/:id/rechazar')
+  @RequirePermission('shift.manage')
+  async rechazarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.managerId) {
+      throw new BadRequestException('managerId es obligatorio');
+    }
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    const solicitud = await this.solicitudTrabajoAdicionalAplicador.rechazarSolicitud(
+      ctx.tx,
+      tenantId,
+      id,
+      dto.managerId,
+      dto.motivoRechazo,
+    );
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Get('trabajo-adicional/:id')
+  @RequirePermission('shift.read')
+  async obtenerTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
+    const ctx = getTenantContext();
+    const solicitud = await this.solicitudTrabajoAdicional.obtenerSolicitud(ctx.tx, id);
+    if (!solicitud) {
+      throw new NotFoundException(`Solicitud ${id} no encontrada`);
+    }
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Post('trabajo-adicional/:id/reporte')
+  @RequirePermission('shift.read')
+  async enviarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.reporteDescripcion || !dto?.reporteFotos) {
+      throw new BadRequestException('reporteDescripcion y reporteFotos son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!employee) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    const solicitud = await this.solicitudTrabajoAdicional.enviarReporte(ctx.tx, {
+      tenantId,
+      id,
+      employeeId: employee.id,
+      reporteDescripcion: dto.reporteDescripcion,
+      reporteFotos: dto.reporteFotos,
+      reporteNotas: dto.reporteNotas,
+    });
+
+    if (solicitud.managerId) {
+      try {
+        await this.notificacion.notificarReporteEnviado(
+          tenantId,
+          solicitud.managerId,
+          solicitud.descripcionTarea,
+          solicitud.fechaEstimada,
+        );
+      } catch {
+        // No bloqueante: NotificationService ya loguea internamente sus errores.
+      }
+    }
+
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Put('trabajo-adicional/:id/validar')
+  @RequirePermission('shift.manage')
+  async validarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.managerId) {
+      throw new BadRequestException('managerId es obligatorio');
+    }
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    const solicitud = await this.solicitudTrabajoAdicionalAplicador.validarReporte(
+      ctx.tx,
+      tenantId,
+      id,
+      dto.managerId,
+    );
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
+  }
+
+  @Put('trabajo-adicional/:id/reporte-rechazar')
+  @RequirePermission('shift.manage')
+  async rechazarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    if (!dto?.managerId) {
+      throw new BadRequestException('managerId es obligatorio');
+    }
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    const solicitud = await this.solicitudTrabajoAdicionalAplicador.rechazarReporte(
+      ctx.tx,
+      tenantId,
+      id,
+      dto.managerId,
+      dto.motivo,
+    );
+    return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
 }
