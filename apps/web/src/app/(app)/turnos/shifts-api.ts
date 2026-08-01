@@ -318,3 +318,94 @@ export async function enviarReporteTrabajo(
     'enviar el reporte',
   );
 }
+
+// ---------------------------------------------------------------------------
+// Trabajo Fuera de Turno (Manager)
+// ---------------------------------------------------------------------------
+
+export interface FiltrosTrabajoAdicional {
+  employeeId?: string;
+  fechaDesde?: string;
+  fechaHasta?: string;
+}
+
+export const listarPendientesTrabajo = async (
+  filtros?: FiltrosTrabajoAdicional,
+): Promise<SolicitudTrabajoAdicional[]> => {
+  const params = new URLSearchParams();
+  if (filtros?.employeeId) params.append('employeeId', filtros.employeeId);
+  if (filtros?.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+  if (filtros?.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+
+  const qs = params.toString();
+  return ok(
+    await apiFetch(`/turnos/trabajo-adicional/pendientes${qs ? `?${qs}` : ''}`),
+    'listar las solicitudes pendientes',
+  );
+};
+
+export const listarReportesValidar = async (
+  filtros?: FiltrosTrabajoAdicional,
+): Promise<SolicitudTrabajoAdicional[]> => {
+  const params = new URLSearchParams();
+  if (filtros?.employeeId) params.append('employeeId', filtros.employeeId);
+  if (filtros?.fechaDesde) params.append('fechaDesde', filtros.fechaDesde);
+  if (filtros?.fechaHasta) params.append('fechaHasta', filtros.fechaHasta);
+
+  const qs = params.toString();
+  return ok(
+    await apiFetch(`/turnos/trabajo-adicional/validar${qs ? `?${qs}` : ''}`),
+    'listar los reportes por validar',
+  );
+};
+
+export const aprobarTrabajoAdicional = async (id: string, managerId: string): Promise<SolicitudTrabajoAdicional> =>
+  ok(
+    await apiFetch(`/turnos/trabajo-adicional/${id}/aprobar`, { method: 'PUT', body: JSON.stringify({ managerId }) }),
+    'aprobar el trabajo adicional',
+  );
+
+export const reasignarTrabajoAdicional = async (
+  id: string,
+  managerId: string,
+  employeeIdNuevo: string,
+): Promise<SolicitudTrabajoAdicional> =>
+  ok(
+    await apiFetch(`/turnos/trabajo-adicional/${id}/reasignar`, {
+      method: 'PUT',
+      body: JSON.stringify({ managerId, employeeIdNuevo }),
+    }),
+    'reasignar el trabajo adicional',
+  );
+
+export const rechazarTrabajoAdicional = async (
+  id: string,
+  managerId: string,
+  motivoRechazo?: string,
+): Promise<SolicitudTrabajoAdicional> =>
+  ok(
+    await apiFetch(`/turnos/trabajo-adicional/${id}/rechazar`, {
+      method: 'PUT',
+      body: JSON.stringify({ managerId, motivoRechazo }),
+    }),
+    'rechazar el trabajo adicional',
+  );
+
+export const validarReporteTrabajo = async (id: string, managerId: string): Promise<SolicitudTrabajoAdicional> =>
+  ok(
+    await apiFetch(`/turnos/trabajo-adicional/${id}/validar`, { method: 'PUT', body: JSON.stringify({ managerId }) }),
+    'validar el reporte',
+  );
+
+export const pedirReentregaReporte = async (
+  id: string,
+  managerId: string,
+  motivo?: string,
+): Promise<SolicitudTrabajoAdicional> =>
+  ok(
+    await apiFetch(`/turnos/trabajo-adicional/${id}/reporte-rechazar`, {
+      method: 'PUT',
+      body: JSON.stringify({ managerId, motivo }),
+    }),
+    'pedir la reentrega del reporte',
+  );

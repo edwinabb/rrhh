@@ -10,6 +10,7 @@ import { PatronesAplicarTab } from './patrones-aplicar-tab';
 import { MisCambiosTab } from './mis-cambios-tab';
 import { CambiosBoardTab } from './cambios-board-tab';
 import { TrabajoAdicionalEmpleadoTab } from './trabajo-adicional-empleado-tab';
+import { TrabajoAdicionalManagerTab } from './trabajo-adicional-manager-tab';
 
 const TABS = [
   { id: 'plan', label: 'Plan' },
@@ -21,6 +22,7 @@ const TABS = [
   { id: 'mis-cambios', label: 'Mis Cambios' },
   { id: 'cambios-board', label: 'Cambios (Manager)' },
   { id: 'trabajo-adicional-empleado', label: 'Trabajo Adicional' },
+  { id: 'trabajo-adicional-manager', label: 'Trabajo Adicional (Manager)' },
 ] as const;
 
 export default function TurnosPage() {
@@ -49,6 +51,7 @@ export default function TurnosPage() {
       {tab === 'mis-cambios' && <MisCambiosTab />}
       {tab === 'cambios-board' && <CambiosBoardTab />}
       {tab === 'trabajo-adicional-empleado' && <TrabajoAdicionalEmpleadoTab />}
+      {tab === 'trabajo-adicional-manager' && <TrabajoAdicionalManagerTab />}
     </div>
   );
 }
