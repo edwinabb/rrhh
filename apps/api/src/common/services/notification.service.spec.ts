@@ -403,6 +403,10 @@ describe('NotificationService', () => {
     const fechaEstimada = new Date('2026-08-20');
     await service.notificarTrabajoReasignado('t-1', 'emp-2', 'Migrar base de datos', fechaEstimada, 6);
 
+    expect(prisma.employee.findUnique).toHaveBeenCalledWith({
+      where: { id: 'emp-2' },
+      select: { id: true, user: { select: { email: true } } },
+    });
     expect(enviarEmailSpy).toHaveBeenCalledWith(
       'emp2@test.com',
       'Trabajo adicional asignado',
@@ -474,6 +478,10 @@ describe('NotificationService', () => {
 
     await service.notificarTrabajoRechazado('t-1', 'emp-1', 'Presupuesto insuficiente');
 
+    expect(prisma.employee.findUnique).toHaveBeenCalledWith({
+      where: { id: 'emp-1' },
+      select: { id: true, user: { select: { email: true } } },
+    });
     expect(enviarEmailSpy).toHaveBeenCalledWith(
       'emp1@test.com',
       'Trabajo adicional rechazado',
@@ -562,10 +570,14 @@ describe('NotificationService', () => {
 
     await service.notificarReporteValidado('t-1', 'emp-1', 'Reparar servidor de backups', 2);
 
+    expect(prisma.employee.findUnique).toHaveBeenCalledWith({
+      where: { id: 'emp-1' },
+      select: { id: true, user: { select: { email: true } } },
+    });
     expect(enviarEmailSpy).toHaveBeenCalledWith(
       'emp1@test.com',
       'Reporte de trabajo adicional validado',
-      expect.stringContaining('2'),
+      expect.stringContaining('2 día'),
     );
   });
 
@@ -630,6 +642,10 @@ describe('NotificationService', () => {
 
     await service.notificarReportePedidoReentrega('t-1', 'emp-1', 'Fotos ilegibles');
 
+    expect(prisma.employee.findUnique).toHaveBeenCalledWith({
+      where: { id: 'emp-1' },
+      select: { id: true, user: { select: { email: true } } },
+    });
     expect(enviarEmailSpy).toHaveBeenCalledWith(
       'emp1@test.com',
       'Reporte de trabajo adicional rechazado',
