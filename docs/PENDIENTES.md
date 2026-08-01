@@ -1,6 +1,6 @@
 # Pendientes y Plan de Trabajo
 
-**Actualizado:** 2026-07-30 (Sprint 7 5/9 tareas, v1.3.0) · **Estado del sistema:** todo verde — 104 tests pass, Sprint 6 completo (Feature 1 Patrones), Sprint 7 55% (Feature 2 Cambios en progreso).
+**Actualizado:** 2026-08-01 (Sprint 8 completo, v1.3.0) · **Estado del sistema:** todo verde — 498 tests pass, 0 errores TypeScript, Sprint 6 ✅ (Feature 1 Patrones) + Sprint 7 ✅ (Feature 2 Cambios) + Sprint 8 ✅ (Feature 3 Trabajo Fuera de Turno) — 3/4 features completadas.
 
 ---
 
@@ -12,9 +12,9 @@
 4 features independientes con tabs separados en `/turnos`:
 
 1. **✅ Sprint 6 - Patrones de Rotación (COMPLETO):** Manager define patrón recurrente (ej: 2 DIA + 2 NOCHE + 3 DESC) e inyecta masivamente al plan. 9/9 tareas completadas (2026-07-30). Feature: catálogo de patrones + aplicador con preview editable + notificaciones + E2E testing. Tests: 328/328 pass. PR merged.
-2. **⏳ Sprint 7 - Cambios de Turno (EN PROGRESO 5/9):** Empleado solicita cambio → Manager aprueba/rechaza → reintentos permitidos. 5/9 tareas completadas (backend + frontend core). Modelo + CRUD + lógica transaccional + API endpoints + "Mis Cambios" tab. Pendientes: manager board + notificaciones + E2E + verificación. PR #1 awaiting review.
-3. **⏳ Sprint 8 - Trabajo Fuera de Turno:** Empleado reporta trabajo extra (tarea + fotos + timestamp) → Director/RRHH valida → genera compensatorio. Datos privados (Manager-only). ~20 tareas.
-4. **⏳ Sprint 9 - Portal de Intercambios:** Empleados negocian peer-to-peer (empleado A ↔ B) → Manager aprueba. Intercambios neutrales para compensatorios. ~15 tareas.
+2. **✅ Sprint 7 - Cambios de Turno (COMPLETO):** Empleado solicita cambio → Manager aprueba/rechaza → reintentos permitidos. 9/9 tareas completadas (2026-07-30). Modelo + CRUD + lógica transaccional + 5 endpoints API + tab "Mis Cambios" (empleado) + tablero Kanban (manager) + notificaciones + E2E testing. Tests: 391/391 pass. v1.3.0.
+3. **✅ Sprint 8 - Trabajo Fuera de Turno (COMPLETO):** Empleado reporta trabajo extra (tarea + fotos + timestamp) → Manager valida → genera compensatorio automáticamente. Datos privados (Manager-only: causaHorasExtras, horasAcumuladas, saldoCompensatorios). 9/9 tareas completadas (2026-07-30 a 2026-08-01). Modelo `SolicitudTrabajoAdicional` + RLS + migration, CRUD + report service, orquestación (aprobar/reasignar/rechazar solicitud + validar/rechazar reporte, incl. creación automática de movimiento GANADO en el libro de compensatorios), 11 endpoints con RBAC, tab empleado (Solicitar + Mis Trabajos), tab manager (Pendientes + Validar), 7 métodos de notificación, E2E integration test (70 assertions). Tests: 498/498 pass (0 fallas, 0 errores TypeScript). Commits: `02c647c..a9f47a3` (11, uno de ellos fix-round de nombres de índice). Branch: `feat/turnos-trabajo-extra-fase-8`.
+4. **⏳ Sprint 9 - Portal de Intercambios (SIGUIENTE):** Empleados negocian peer-to-peer (empleado A ↔ B) → Manager aprueba. Intercambios neutrales para compensatorios. ~15 tareas estimadas. Referencia de arquitectura: réplicar patrón de Sprints 6-8 (subagent-driven-development, 1 implementador + revisor por tarea).
 
 **Principios:**
 - Independencia: ciclos separados, permisos RBAC distintos, parallelizable
@@ -23,6 +23,14 @@
 - Datos privados (Feature 3): horasAcumuladas, causaHorasExtras, saldoCompensatorios solo para Manager/Director
 - Fotos con timestamp visible en imagen (Feature 3)
 - Reporte rechazado permite reintentos infinitos hasta validación (Feature 3)
+
+---
+
+## 📌 Próximos pasos inmediatos
+
+- Sprint 8 (Feature 3: Trabajo Fuera de Turno) completo — 9/9 tareas, 498 tests, 0 errores TypeScript, build web OK. Pendiente: crear PR a `master` con el historial completo de commits (`02c647c..HEAD`) y merge.
+- Tras el merge: tag de versión, cleanup del worktree `.worktrees/feat-turnos-trabajo-extra-fase-8`.
+- Sprint 9 (Feature 4: Portal de Intercambios) es el siguiente en la cola — última feature de autoservicio de Fases 6-9 (empleado A ↔ empleado B negocian intercambio de turno, Manager aprueba). Usar el mismo plan/worktree pattern que Sprints 6-8 (`docs/superpowers/plans/`, ledger en `.superpowers/sdd/`).
 
 ---
 
@@ -87,6 +95,12 @@ Dashboard del ciclo con advertencias antes de procesar: trabajadores sin cuenta 
 #### Sprint 7 Identificada
 - [ ] **P2002 edge case:** Schema constraint `@@unique([tenantId, employeeId, fechaActual])` sin filtro de estado. Re-requests después de RECHAZADA/APROBADA pasarán validación de servicio pero fallarán en DB. Solución: catch Prisma P2002 + translate a ConflictException, o ajustar constraint a `@@unique([..., estado])`. Priority: LOW (edge case raro). Task 3 flagged, puede addressed en Task 6-9 o follow-up.
 - [ ] **Notificaciones Task 7:** Métodos `notificarSolicitudAprobada` y `notificarSolicitudRechazada` agregados a NotificationService en Task 3 (nominalmente Task 7 scope). Revisar scope creep; probablemente OK ya que fueron necesarios para Task 3 integration.
+
+#### Sprint 8 Identificada
+- [ ] **`obtenerSolicitud` sin filtro tenantId:** El `findUnique` de `SolicitudTrabajoAdicionalService.obtenerSolicitud` (Task 2) no filtra explícitamente por `tenantId` en la query — pre-existente desde Task 2, señalado como Minor en la revisión de Task 4. Se asume cubierto por RLS a nivel de transacción (como el resto del módulo), pero queda pendiente confirmarlo con un test dedicado de aislamiento cross-tenant. Priority: LOW.
+- [ ] **Conversión horas→días para compensatorio:** El libro de compensatorios (`CompensatorioService`) es day-based (`dias: number`), pero Sprint 8 habla en horas ("3h extra → 3h compensatoria"). Decisión deliberada: `validarReporte` convierte `horasEstimadas / 8` (jornada estándar, redondeado a 2 decimales) al registrar el movimiento GANADO, reutilizando el ledger existente en vez de construir uno paralelo en horas. No es deuda per se, pero es un puente de unidades a tener presente si se audita el saldo de compensatorios.
+- [ ] **`reporteFotos` como base64 data-URLs sin blob storage dedicado:** No existe infraestructura de almacenamiento de blobs en el repo para este feature (el único precedente, `uploadDocument` de legajo, tiene su propio endpoint de storage que no se replicó aquí). El frontend (Task 5) lee cada foto seleccionada con `FileReader.readAsDataURL` y envía el string base64 directo dentro del array `reporteFotos` en el body de `POST .../reporte`. Funciona para volúmenes bajos, pero es un gap arquitectónico real si el volumen/tamaño de fotos crece — candidato a resolver en Sprint 9+ si el reporte fotográfico se vuelve una feature más pesada (mover a upload a MinIO/blob storage + solo persistir URLs).
+- [ ] **Notificación al manager vía `Employee.managerId`:** `notificarSolicitudTrabajoCreada` (Task 3/4) es la primera notificación del código que resuelve un manager a través de la auto-relación `Employee.managerId` para notificar al aprobador — no hay precedente de "notificar al manager" en Sprints 6-7 (ahí el manager ya interactúa desde un tablero, no se le notifica proactivamente). No es un bug, pero es un patrón nuevo a tener en cuenta para mantenimiento futuro (ej. si `managerId` es null, la notificación se omite silenciosamente — comportamiento cubierto por tests en `notification.service.spec.ts`).
 
 #### Sprint 6+ Existente
 - [ ] Tests de frontend (no existe infraestructura; hoy la barra es tsc + next build)
