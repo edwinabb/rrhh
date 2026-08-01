@@ -49,6 +49,11 @@ const ESTADOS_NO_TERMINALES_DUPLICADO: readonly EstadoSolicitudTrabajoAdicional[
 
 const JORNADA_SEMANAL_MAXIMA_DEFAULT = 48;
 
+/** data:image/(jpeg|jpg|png);base64,... — case-insensitive en el subtipo mime. */
+const FOTO_DATA_URL_REGEX = /^data:image\/(jpeg|jpg|png);base64,[A-Za-z0-9+/=]+$/i;
+/** ~7MB en base64 (equivalente a ~5MB de archivo original), límite anti-DoS por foto. */
+const FOTO_MAX_LENGTH = 7_000_000;
+
 /** Lunes (00:00) de la semana de la fecha dada. */
 function lunesDe(fecha: Date): Date {
   const d = new Date(fecha);
@@ -247,6 +252,13 @@ export class SolicitudTrabajoAdicionalService {
     }
     if (!input.reporteFotos || input.reporteFotos.length < 2) {
       throw new BadRequestException('reporteFotos requiere al menos 2 fotos');
+    }
+    for (const foto of input.reporteFotos) {
+      if (typeof foto !== 'string' || foto.length > FOTO_MAX_LENGTH || !FOTO_DATA_URL_REGEX.test(foto)) {
+        throw new BadRequestException(
+          'reporteFotos debe contener data-URLs de imagen (jpeg/jpg/png) en base64, de hasta ~7MB cada una',
+        );
+      }
     }
 
     return tx.solicitudTrabajoAdicional.update({

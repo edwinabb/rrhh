@@ -898,8 +898,8 @@ model SolicitudTrabajoAdicional {
   solicitante             Employee @relation("SolicitudTrabajoAdicionalSolicitante", fields: [employeeIdSolicitante], references: [id], onDelete: Cascade)
   asignado                Employee @relation("SolicitudTrabajoAdicionalAsignado", fields: [employeeIdAsignado], references: [id])
 
-  @@index([tenantId, employeeIdSolicitante])
-  @@index([tenantId, employeeIdAsignado])
+  @@index([tenantId, employeeIdSolicitante], map: "solicitud_trabajo_adicional_tenant_solicitante_idx")
+  @@index([tenantId, employeeIdAsignado], map: "solicitud_trabajo_adicional_tenant_asignado_idx")
   @@index([tenantId, estado])
   @@map("solicitud_trabajo_adicional")
 }

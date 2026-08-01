@@ -258,13 +258,16 @@ describe('SolicitudTrabajoAdicionalService', () => {
   });
 
   describe('enviarReporte', () => {
+    const FOTO_VALIDA_1 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAAAAAAAD/2wBD';
+    const FOTO_VALIDA_2 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA';
+
     function reporteInput(overrides: any = {}) {
       return {
         tenantId: TENANT,
         id: 'sol-1',
         employeeId: ASIGNADO,
         reporteDescripcion: 'Tarea completada según lo solicitado',
-        reporteFotos: ['https://x/foto1.jpg', 'https://x/foto2.jpg'],
+        reporteFotos: [FOTO_VALIDA_1, FOTO_VALIDA_2],
         ...overrides,
       };
     }
@@ -330,8 +333,78 @@ describe('SolicitudTrabajoAdicionalService', () => {
       const service = crearServicio();
 
       await expect(
-        service.enviarReporte(tx, reporteInput({ reporteFotos: ['https://x/foto1.jpg'] })),
+        service.enviarReporte(tx, reporteInput({ reporteFotos: [FOTO_VALIDA_1] })),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza fotos con formato inválido (no es data-URL de imagen)', async () => {
+      const tx = mockTx();
+      tx.solicitudTrabajoAdicional.findFirst.mockResolvedValue({
+        id: 'sol-1',
+        tenantId: TENANT,
+        employeeIdAsignado: ASIGNADO,
+        estado: 'APROBADA',
+      });
+      const service = crearServicio();
+
+      await expect(
+        service.enviarReporte(
+          tx,
+          reporteInput({ reporteFotos: [FOTO_VALIDA_1, '<script>alert(1)</script>'] }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza fotos con un mime type no permitido', async () => {
+      const tx = mockTx();
+      tx.solicitudTrabajoAdicional.findFirst.mockResolvedValue({
+        id: 'sol-1',
+        tenantId: TENANT,
+        employeeIdAsignado: ASIGNADO,
+        estado: 'APROBADA',
+      });
+      const service = crearServicio();
+
+      await expect(
+        service.enviarReporte(
+          tx,
+          reporteInput({
+            reporteFotos: [FOTO_VALIDA_1, 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4='],
+          }),
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rechaza fotos que exceden el tamaño máximo (~7MB en base64)', async () => {
+      const tx = mockTx();
+      tx.solicitudTrabajoAdicional.findFirst.mockResolvedValue({
+        id: 'sol-1',
+        tenantId: TENANT,
+        employeeIdAsignado: ASIGNADO,
+        estado: 'APROBADA',
+      });
+      const service = crearServicio();
+
+      const fotoGigante = 'data:image/png;base64,' + 'A'.repeat(7_000_001);
+
+      await expect(
+        service.enviarReporte(tx, reporteInput({ reporteFotos: [FOTO_VALIDA_1, fotoGigante] })),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('acepta fotos válidas en formato data-URL (jpeg y png)', async () => {
+      const tx = mockTx();
+      tx.solicitudTrabajoAdicional.findFirst.mockResolvedValue({
+        id: 'sol-1',
+        tenantId: TENANT,
+        employeeIdAsignado: ASIGNADO,
+        estado: 'APROBADA',
+      });
+      const service = crearServicio();
+
+      const resultado = await service.enviarReporte(tx, reporteInput());
+
+      expect(resultado.estado).toBe('REPORTE_PENDIENTE_VALIDACION');
     });
 
     it('permite reenvío desde REPORTE_RECHAZADO (reintentos infinitos)', async () => {

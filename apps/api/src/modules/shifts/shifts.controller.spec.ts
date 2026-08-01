@@ -920,6 +920,27 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
       );
     });
 
+    it('ignores a client-supplied employeeIdAsignado and always uses the resolved employee.id', async () => {
+      const dto = {
+        descripcionTarea: 'Reparar equipo',
+        fechaEstimada: '2026-08-15',
+        horasEstimadas: 4,
+        urgencia: 'NORMAL',
+        employeeIdAsignado: 'emp-foraneo-otro-tenant',
+      };
+      mockSolicitudTrabajoAdicionalService.crearSolicitud.mockResolvedValue({ id: 'sta-1' });
+
+      await controller.solicitarTrabajoAdicional(mockManagerRequest, dto);
+
+      expect(mockSolicitudTrabajoAdicionalService.crearSolicitud).toHaveBeenCalledWith(
+        mockTenantContext.tx,
+        expect.objectContaining({
+          employeeIdSolicitante: 'emp-1',
+          employeeIdAsignado: 'emp-1',
+        })
+      );
+    });
+
     it('removes private fields for non-managers', async () => {
       const dto = {
         descripcionTarea: 'Reparar equipo',
@@ -1014,36 +1035,39 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
   });
 
   describe('PUT /turnos/trabajo-adicional/:id/aprobar', () => {
-    it('approves a request', async () => {
-      const dto = { managerId: 'mgr-1' };
+    it('resolves the manager Employee.id server-side and ignores any client-supplied managerId', async () => {
       const mockResult = { id: 'sta-1', estado: 'APROBADA' };
       mockSolicitudTrabajoAdicionalAplicadorService.aprobarSolicitud.mockResolvedValue(mockResult);
 
-      const resultado = await controller.aprobarTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+      const resultado = await controller.aprobarTrabajoAdicional(mockManagerRequest, 'sta-1');
 
+      // manager.id ('emp-1') resuelto vía ctx.tx.employee.findFirst({ where: { userId } }),
+      // NUNCA un valor tomado de dto.managerId (que el frontend enviaba como User.id).
       expect(mockSolicitudTrabajoAdicionalAplicadorService.aprobarSolicitud).toHaveBeenCalledWith(
-        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1',
+        mockTenantContext.tx, 't-1', 'sta-1', 'emp-1',
       );
       expect(resultado).toEqual(mockResult);
     });
 
-    it('rejects without managerId', async () => {
+    it('throws when the caller has no associated employee', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
       await expect(
-        controller.aprobarTrabajoAdicional(mockManagerRequest, 'sta-1', {})
-      ).rejects.toThrow('managerId es obligatorio');
+        controller.aprobarTrabajoAdicional(mockManagerRequest, 'sta-1')
+      ).rejects.toThrow('La sesión no tiene un empleado asociado');
     });
   });
 
   describe('PUT /turnos/trabajo-adicional/:id/reasignar', () => {
-    it('reassigns a request', async () => {
-      const dto = { managerId: 'mgr-1', employeeIdNuevo: 'emp-2' };
+    it('resolves the manager Employee.id server-side and ignores any client-supplied managerId', async () => {
+      const dto = { managerId: 'mgr-suplantado', employeeIdNuevo: 'emp-2' };
       const mockResult = { id: 'sta-1', estado: 'REASIGNADA', employeeIdAsignado: 'emp-2' };
       mockSolicitudTrabajoAdicionalAplicadorService.reasignarSolicitud.mockResolvedValue(mockResult);
 
       const resultado = await controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
 
       expect(mockSolicitudTrabajoAdicionalAplicadorService.reasignarSolicitud).toHaveBeenCalledWith(
-        mockTenantContext.tx, 't-1', 'sta-1', 'emp-2', 'mgr-1',
+        mockTenantContext.tx, 't-1', 'sta-1', 'emp-2', 'emp-1',
       );
       expect(resultado).toEqual(mockResult);
       expect(resultado).not.toHaveProperty('emailEnviado');
@@ -1051,41 +1075,50 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
 
     it('rejects without employeeIdNuevo', async () => {
       await expect(
-        controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', { managerId: 'mgr-1' })
-      ).rejects.toThrow('managerId y employeeIdNuevo son obligatorios');
+        controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', {})
+      ).rejects.toThrow('employeeIdNuevo es obligatorio');
     });
 
-    it('rejects without managerId', async () => {
+    it('throws when the caller has no associated employee', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
       await expect(
         controller.reasignarTrabajoAdicional(mockManagerRequest, 'sta-1', { employeeIdNuevo: 'emp-2' })
-      ).rejects.toThrow('managerId y employeeIdNuevo son obligatorios');
+      ).rejects.toThrow('La sesión no tiene un empleado asociado');
     });
   });
 
   describe('PUT /turnos/trabajo-adicional/:id/rechazar', () => {
-    it('rejects a request', async () => {
-      const dto = { managerId: 'mgr-1', motivoRechazo: 'No procede' };
+    it('resolves the manager Employee.id server-side and ignores any client-supplied managerId', async () => {
+      const dto = { managerId: 'mgr-suplantado', motivoRechazo: 'No procede' };
       const mockResult = { id: 'sta-1', estado: 'RECHAZADA', motivoRechazo: 'No procede' };
       mockSolicitudTrabajoAdicionalAplicadorService.rechazarSolicitud.mockResolvedValue(mockResult);
 
       const resultado = await controller.rechazarTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
 
       expect(mockSolicitudTrabajoAdicionalAplicadorService.rechazarSolicitud).toHaveBeenCalledWith(
-        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1', 'No procede',
+        mockTenantContext.tx, 't-1', 'sta-1', 'emp-1', 'No procede',
       );
       expect(resultado).toEqual(mockResult);
     });
 
-    it('rejects without managerId', async () => {
+    it('throws when the caller has no associated employee', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
       await expect(
         controller.rechazarTrabajoAdicional(mockManagerRequest, 'sta-1', { motivoRechazo: 'X' })
-      ).rejects.toThrow('managerId es obligatorio');
+      ).rejects.toThrow('La sesión no tiene un empleado asociado');
     });
   });
 
   describe('GET /turnos/trabajo-adicional/:id', () => {
-    it('returns a request by id', async () => {
-      const mockResult = { id: 'sta-1', estado: 'PENDIENTE_APROBACION' };
+    it('returns a request by id for a manager', async () => {
+      const mockResult = {
+        id: 'sta-1',
+        estado: 'PENDIENTE_APROBACION',
+        employeeIdSolicitante: 'emp-otro',
+        employeeIdAsignado: 'emp-otro2',
+      };
       mockSolicitudTrabajoAdicionalService.obtenerSolicitud.mockResolvedValue(mockResult);
 
       const resultado = await controller.obtenerTrabajoAdicional(mockManagerRequest, 'sta-1');
@@ -1094,6 +1127,48 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
         mockTenantContext.tx, 'sta-1',
       );
       expect(resultado).toEqual(mockResult);
+    });
+
+    it('returns a request by id for the solicitante owner', async () => {
+      const mockResult = {
+        id: 'sta-1',
+        estado: 'PENDIENTE_APROBACION',
+        employeeIdSolicitante: 'emp-1',
+        employeeIdAsignado: 'emp-otro',
+      };
+      mockSolicitudTrabajoAdicionalService.obtenerSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.obtenerTrabajoAdicional(mockRequest, 'sta-1');
+
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('returns a request by id for the asignado owner', async () => {
+      const mockResult = {
+        id: 'sta-1',
+        estado: 'PENDIENTE_APROBACION',
+        employeeIdSolicitante: 'emp-otro',
+        employeeIdAsignado: 'emp-1',
+      };
+      mockSolicitudTrabajoAdicionalService.obtenerSolicitud.mockResolvedValue(mockResult);
+
+      const resultado = await controller.obtenerTrabajoAdicional(mockRequest, 'sta-1');
+
+      expect(resultado).toEqual(mockResult);
+    });
+
+    it('throws NotFoundException for a non-owner, non-manager caller', async () => {
+      const mockResult = {
+        id: 'sta-1',
+        estado: 'PENDIENTE_APROBACION',
+        employeeIdSolicitante: 'emp-otro',
+        employeeIdAsignado: 'emp-otro2',
+      };
+      mockSolicitudTrabajoAdicionalService.obtenerSolicitud.mockResolvedValue(mockResult);
+
+      await expect(
+        controller.obtenerTrabajoAdicional(mockRequest, 'sta-1')
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when missing', async () => {
@@ -1166,44 +1241,47 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
   });
 
   describe('PUT /turnos/trabajo-adicional/:id/validar', () => {
-    it('validates a report', async () => {
-      const dto = { managerId: 'mgr-1' };
+    it('resolves the manager Employee.id server-side and ignores any client-supplied managerId', async () => {
       const mockResult = { id: 'sta-1', estado: 'VALIDADA' };
       mockSolicitudTrabajoAdicionalAplicadorService.validarReporte.mockResolvedValue(mockResult);
 
-      const resultado = await controller.validarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
+      const resultado = await controller.validarReporteTrabajoAdicional(mockManagerRequest, 'sta-1');
 
       expect(mockSolicitudTrabajoAdicionalAplicadorService.validarReporte).toHaveBeenCalledWith(
-        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1',
+        mockTenantContext.tx, 't-1', 'sta-1', 'emp-1',
       );
       expect(resultado).toEqual(mockResult);
     });
 
-    it('rejects without managerId', async () => {
+    it('throws when the caller has no associated employee', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
       await expect(
-        controller.validarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', {})
-      ).rejects.toThrow('managerId es obligatorio');
+        controller.validarReporteTrabajoAdicional(mockManagerRequest, 'sta-1')
+      ).rejects.toThrow('La sesión no tiene un empleado asociado');
     });
   });
 
   describe('PUT /turnos/trabajo-adicional/:id/reporte-rechazar', () => {
-    it('rejects a report', async () => {
-      const dto = { managerId: 'mgr-1', motivo: 'Fotos insuficientes' };
+    it('resolves the manager Employee.id server-side and ignores any client-supplied managerId', async () => {
+      const dto = { managerId: 'mgr-suplantado', motivo: 'Fotos insuficientes' };
       const mockResult = { id: 'sta-1', estado: 'REPORTE_RECHAZADO', motivoRechazo: 'Fotos insuficientes' };
       mockSolicitudTrabajoAdicionalAplicadorService.rechazarReporte.mockResolvedValue(mockResult);
 
       const resultado = await controller.rechazarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', dto);
 
       expect(mockSolicitudTrabajoAdicionalAplicadorService.rechazarReporte).toHaveBeenCalledWith(
-        mockTenantContext.tx, 't-1', 'sta-1', 'mgr-1', 'Fotos insuficientes',
+        mockTenantContext.tx, 't-1', 'sta-1', 'emp-1', 'Fotos insuficientes',
       );
       expect(resultado).toEqual(mockResult);
     });
 
-    it('rejects without managerId', async () => {
+    it('throws when the caller has no associated employee', async () => {
+      mockTenantContext.tx.employee.findFirst.mockResolvedValue(null);
+
       await expect(
         controller.rechazarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', { motivo: 'X' })
-      ).rejects.toThrow('managerId es obligatorio');
+      ).rejects.toThrow('La sesión no tiene un empleado asociado');
     });
   });
 });

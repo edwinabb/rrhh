@@ -64,6 +64,10 @@ export function TrabajoAdicionalManagerTab() {
   const [isPidiendoReentrega, setIsPidiendoReentrega] = useState(false);
   const reentregaHeadingId = useRef('reentrega-modal-heading');
 
+  // --- Lightbox de foto de reporte ---
+  const [fotoLightbox, setFotoLightbox] = useState<string | null>(null);
+  const fotoLightboxHeadingId = useRef('foto-lightbox-heading');
+
   useEffect(() => {
     if (!puedeGestionar) return;
     listarEmpleados().then(setEmpleados).catch((e) => setError((e as Error).message));
@@ -250,17 +254,26 @@ export function TrabajoAdicionalManagerTab() {
 
   // --- Escape key handlers ---
   useEffect(() => {
-    if (!showModalReasignar && !showModalRechazo && !showModalReentrega) return;
+    if (!showModalReasignar && !showModalRechazo && !showModalReentrega && !fotoLightbox) return;
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (showModalReasignar) handleCerrarReasignar();
       if (showModalRechazo) handleCerrarRechazo();
       if (showModalReentrega) handleCerrarReentrega();
+      if (fotoLightbox) handleCerrarFotoLightbox();
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showModalReasignar, showModalRechazo, showModalReentrega, isReasignando, isRechazando, isPidiendoReentrega]);
+  }, [
+    showModalReasignar,
+    showModalRechazo,
+    showModalReentrega,
+    fotoLightbox,
+    isReasignando,
+    isRechazando,
+    isPidiendoReentrega,
+  ]);
 
   function handleBackdropClickReasignar(e: React.MouseEvent) {
     if (e.target === e.currentTarget) handleCerrarReasignar();
@@ -271,12 +284,16 @@ export function TrabajoAdicionalManagerTab() {
   function handleBackdropClickReentrega(e: React.MouseEvent) {
     if (e.target === e.currentTarget) handleCerrarReentrega();
   }
+  function handleBackdropClickFotoLightbox(e: React.MouseEvent) {
+    if (e.target === e.currentTarget) handleCerrarFotoLightbox();
+  }
 
   function abrirFoto(foto: string) {
-    const ventana = window.open();
-    if (ventana) {
-      ventana.document.write(`<img src="${foto}" style="max-width:100%;" />`);
-    }
+    setFotoLightbox(foto);
+  }
+
+  function handleCerrarFotoLightbox() {
+    setFotoLightbox(null);
   }
 
   if (!puedeGestionar) {
@@ -782,6 +799,32 @@ export function TrabajoAdicionalManagerTab() {
                 {isPidiendoReentrega ? 'Enviando...' : 'Confirmar'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox de foto de reporte */}
+      {fotoLightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80"
+          onClick={handleBackdropClickFotoLightbox}
+          role="presentation"
+        >
+          <div
+            className="max-h-[90vh] max-w-[90vw]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={fotoLightboxHeadingId.current}
+          >
+            <h2 id={fotoLightboxHeadingId.current} className="sr-only">
+              Foto de reporte ampliada
+            </h2>
+            <img
+              src={fotoLightbox}
+              alt="Foto de reporte ampliada"
+              className="max-h-[90vh] max-w-[90vw] cursor-pointer rounded object-contain"
+              onClick={handleCerrarFotoLightbox}
+            />
           </div>
         </div>
       )}

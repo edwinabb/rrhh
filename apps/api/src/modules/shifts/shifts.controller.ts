@@ -427,7 +427,7 @@ export class ShiftsController {
     const solicitud = await this.solicitudTrabajoAdicional.crearSolicitud(ctx.tx, {
       tenantId,
       employeeIdSolicitante: employee.id,
-      employeeIdAsignado: dto.employeeIdAsignado ?? employee.id,
+      employeeIdAsignado: employee.id,
       descripcionTarea: dto.descripcionTarea,
       fechaEstimada,
       horasEstimadas: Number(dto.horasEstimadas),
@@ -511,17 +511,18 @@ export class ShiftsController {
 
   @Put('trabajo-adicional/:id/aprobar')
   @RequirePermission('shift.manage')
-  async aprobarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
-    if (!dto?.managerId) {
-      throw new BadRequestException('managerId es obligatorio');
-    }
+  async aprobarTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
-    const { tenantId } = requireIdentity(ctx);
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
     const solicitud = await this.solicitudTrabajoAdicionalAplicador.aprobarSolicitud(
       ctx.tx,
       tenantId,
       id,
-      dto.managerId,
+      manager.id,
     );
     return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
@@ -529,17 +530,21 @@ export class ShiftsController {
   @Put('trabajo-adicional/:id/reasignar')
   @RequirePermission('shift.manage')
   async reasignarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
-    if (!dto?.managerId || !dto?.employeeIdNuevo) {
-      throw new BadRequestException('managerId y employeeIdNuevo son obligatorios');
+    if (!dto?.employeeIdNuevo) {
+      throw new BadRequestException('employeeIdNuevo es obligatorio');
     }
     const ctx = getTenantContext();
-    const { tenantId } = requireIdentity(ctx);
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
     const solicitud = await this.solicitudTrabajoAdicionalAplicador.reasignarSolicitud(
       ctx.tx,
       tenantId,
       id,
       dto.employeeIdNuevo,
-      dto.managerId,
+      manager.id,
     );
     return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
@@ -547,17 +552,18 @@ export class ShiftsController {
   @Put('trabajo-adicional/:id/rechazar')
   @RequirePermission('shift.manage')
   async rechazarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
-    if (!dto?.managerId) {
-      throw new BadRequestException('managerId es obligatorio');
-    }
     const ctx = getTenantContext();
-    const { tenantId } = requireIdentity(ctx);
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
     const solicitud = await this.solicitudTrabajoAdicionalAplicador.rechazarSolicitud(
       ctx.tx,
       tenantId,
       id,
-      dto.managerId,
-      dto.motivoRechazo,
+      manager.id,
+      dto?.motivoRechazo,
     );
     return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
@@ -570,6 +576,20 @@ export class ShiftsController {
     if (!solicitud) {
       throw new NotFoundException(`Solicitud ${id} no encontrada`);
     }
+
+    const permissions = (request.session as any)?.permissions ?? [];
+    const tienePermisoManage = permissions.includes('shift.manage');
+    if (!tienePermisoManage) {
+      const { userId } = requireIdentity(ctx);
+      const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+      const esParticipante =
+        !!employee &&
+        (solicitud.employeeIdSolicitante === employee.id || solicitud.employeeIdAsignado === employee.id);
+      if (!esParticipante) {
+        throw new NotFoundException(`Solicitud ${id} no encontrada`);
+      }
+    }
+
     return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
 
@@ -613,17 +633,18 @@ export class ShiftsController {
 
   @Put('trabajo-adicional/:id/validar')
   @RequirePermission('shift.manage')
-  async validarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
-    if (!dto?.managerId) {
-      throw new BadRequestException('managerId es obligatorio');
-    }
+  async validarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
-    const { tenantId } = requireIdentity(ctx);
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
     const solicitud = await this.solicitudTrabajoAdicionalAplicador.validarReporte(
       ctx.tx,
       tenantId,
       id,
-      dto.managerId,
+      manager.id,
     );
     return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
@@ -631,17 +652,18 @@ export class ShiftsController {
   @Put('trabajo-adicional/:id/reporte-rechazar')
   @RequirePermission('shift.manage')
   async rechazarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
-    if (!dto?.managerId) {
-      throw new BadRequestException('managerId es obligatorio');
-    }
     const ctx = getTenantContext();
-    const { tenantId } = requireIdentity(ctx);
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
     const solicitud = await this.solicitudTrabajoAdicionalAplicador.rechazarReporte(
       ctx.tx,
       tenantId,
       id,
-      dto.managerId,
-      dto.motivo,
+      manager.id,
+      dto?.motivo,
     );
     return this.filtrarCamposPrivadosTrabajoAdicional(solicitud, request);
   }
