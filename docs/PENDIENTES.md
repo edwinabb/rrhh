@@ -28,9 +28,22 @@
 
 ## 📌 Próximos pasos inmediatos
 
-- Sprint 8 (Feature 3: Trabajo Fuera de Turno) completo — 9/9 tareas, 498 tests, 0 errores TypeScript, build web OK. Pendiente: crear PR a `master` con el historial completo de commits (`02c647c..HEAD`) y merge.
-- Tras el merge: tag de versión, cleanup del worktree `.worktrees/feat-turnos-trabajo-extra-fase-8`.
+- Sprint 8 (Feature 3: Trabajo Fuera de Turno) completo — 9/9 tareas, 498 tests, 0 errores TypeScript, build web OK, revisión final de rama completa en curso (código ya pasó 9 rondas de revisión por tarea individual). Pendiente: crear PR a `master` con el historial completo de commits (`02c647c..HEAD`) y merge.
+- Tras el merge: bump de versión a `v1.4.0` (root `package.json` sigue en `1.3.0`, sin commit de release todavía — ver Sprint 6/7 como precedente de `release: vX.X.X`), tag de versión, cleanup del worktree `.worktrees/feat-turnos-trabajo-extra-fase-8`.
 - Sprint 9 (Feature 4: Portal de Intercambios) es el siguiente en la cola — última feature de autoservicio de Fases 6-9 (empleado A ↔ empleado B negocian intercambio de turno, Manager aprueba). Usar el mismo plan/worktree pattern que Sprints 6-8 (`docs/superpowers/plans/`, ledger en `.superpowers/sdd/`).
+
+### 🗓️ Plan para el lunes 2026-08-03 (retomar sesión)
+
+1. **Cerrar Sprint 8:**
+   - Revisar el resultado de la revisión final de rama (findings, si los hay, ya resueltos antes de continuar).
+   - Crear PR `feat/turnos-trabajo-extra-fase-8` → `master`, mergear.
+   - Bump de versión `v1.4.0` + tag + commit `release: v1.4.0 - Sprint 8 Trabajo Fuera de Turno completado`.
+   - `git worktree remove .worktrees/feat-turnos-trabajo-extra-fase-8` tras confirmar el merge.
+2. **Arrancar Sprint 9 (Feature 4: Portal de Intercambios):**
+   - Sesión de brainstorming/diseño (spec) antes de escribir el plan de implementación por tareas — mismo flujo que Sprint 8 (`docs/superpowers/specs/2026-07-18-turnos-mejoras-phase-6-9.md` ya tiene la sección de Intercambios como punto de partida, sección correspondiente a Feature 4).
+   - Puntos a definir en el diseño: modelo de "propuesta" A↔B (¿quién inicia, quién confirma?), neutralidad para el libro de compensatorios (un intercambio no debería generar movimientos GANADO/GOZADO, solo reasignar `turnoAsignacion` — ver `CompensatorioService.intercambiar()` que ya existe desde Fase 5 y podría reutilizarse en vez de construirse desde cero), rol del manager (¿aprueba siempre o solo si hay conflicto?).
+   - Crear worktree `.worktrees/feat-turnos-intercambios-fase-9` desde `master` post-merge.
+3. **Si sobra tiempo:** retomar el punto 1 de "Plan de integración post-turnos" (exportes de nómina a la BD real) — es el ítem de mayor valor pendiente fuera del módulo de turnos.
 
 ---
 
