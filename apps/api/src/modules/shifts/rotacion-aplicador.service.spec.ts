@@ -1,6 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import { RotacionAplicadorService } from './rotacion-aplicador.service';
 
+function diasDesdeHoy(dias: number): Date {
+  const fecha = new Date();
+  fecha.setHours(0, 0, 0, 0);
+  fecha.setDate(fecha.getDate() + dias);
+  return fecha;
+}
+
 function mockTx(overrides: any = {}) {
   return {
     rotacionPatron: { findUnique: jest.fn().mockResolvedValue(null) },
@@ -34,9 +41,9 @@ describe('RotacionAplicadorService', () => {
       tenantId: 't-1',
       patronId: 'pat-1',
       employeeIds: ['emp-1', 'emp-2', 'emp-3'],
-      desde: new Date(2026, 7, 1),
-      hasta: new Date(2026, 7, 31),
-      diaInicioCiclo: new Date(2026, 7, 4), // Lunes
+      desde: diasDesdeHoy(1),
+      hasta: diasDesdeHoy(30),
+      diaInicioCiclo: diasDesdeHoy(1),
       creadoPor: 'u-1',
     });
 
@@ -48,8 +55,8 @@ describe('RotacionAplicadorService', () => {
     await expect(
       service.aplicarPatron(tx, {
         tenantId: 't-1', patronId: 'pat-999', employeeIds: ['emp-1'],
-        desde: new Date(2026, 7, 1), hasta: new Date(2026, 7, 31),
-        diaInicioCiclo: new Date(2026, 7, 4), creadoPor: 'u-1'
+        desde: diasDesdeHoy(1), hasta: diasDesdeHoy(30),
+        diaInicioCiclo: diasDesdeHoy(1), creadoPor: 'u-1'
       })
     ).rejects.toThrow('Patrón no encontrado');
   });
@@ -65,9 +72,9 @@ describe('RotacionAplicadorService', () => {
         tenantId: 't-1',
         patronId: 'pat-1',
         employeeIds: ['emp-1'],
-        desde: new Date(2020, 0, 1), // Past date
-        hasta: new Date(2020, 0, 31),
-        diaInicioCiclo: new Date(2020, 0, 4),
+        desde: diasDesdeHoy(-30),
+        hasta: diasDesdeHoy(-1),
+        diaInicioCiclo: diasDesdeHoy(-30),
         creadoPor: 'u-1',
       })
     ).rejects.toThrow(BadRequestException);

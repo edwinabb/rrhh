@@ -2,6 +2,16 @@ import { RotacionPatronService } from './rotacion-patron.service';
 import { RotacionAplicadorService } from './rotacion-aplicador.service';
 import { ShiftPlanService } from './shift-plan.service';
 
+function addDias(fecha: Date, dias: number): Date {
+  const resultado = new Date(fecha);
+  resultado.setDate(resultado.getDate() + dias);
+  return resultado;
+}
+
+function fechaISO(fecha: Date): string {
+  return fecha.toISOString().slice(0, 10);
+}
+
 /**
  * Fake Prisma transaction: an in-memory store backing the subset of the
  * Prisma client surface touched by RotacionPatronService, RotacionAplicadorService
@@ -127,21 +137,27 @@ describe('Feature 1: Autogeneración de Patrones (E2E)', () => {
       creadoPor: 'u-manager',
     });
 
-    // --- Execute: aplicar patrón a 2 empleados durante agosto 2026 ---
+    // --- Execute: aplicar patrón a 2 empleados durante un rango de 31 días ---
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const desde = addDias(hoy, 1);
+    const hasta = addDias(desde, 30);
+    const diaInicioCiclo = addDias(desde, 3);
+
     const resultado = await aplicadorService.aplicarPatron(tx, {
       tenantId,
       patronId: patron.id,
       employeeIds: ['emp-1', 'emp-2'],
-      desde: new Date(2026, 7, 1),
-      hasta: new Date(2026, 7, 31),
-      diaInicioCiclo: new Date(2026, 7, 4), // Lunes
+      desde,
+      hasta,
+      diaInicioCiclo,
       creadoPor: 'u-manager',
     });
 
     // --- Assert: resultado de la aplicación ---
-    // Agosto 2026 tiene 31 días; el rango [2026-08-01, 2026-08-31] es inclusivo
-    // en ambos extremos (ver aplicarPatron: `while (fechaActual <= hasta)`),
-    // por lo tanto son 31 días x 2 empleados = 62 registros.
+    // El rango [desde, hasta] es inclusivo en ambos extremos (ver aplicarPatron:
+    // `while (fechaActual <= hasta)`) y cubre 31 días, por lo tanto son
+    // 31 días x 2 empleados = 62 registros.
     expect(resultado).toEqual({ procesadas: 62, errores: [] });
 
     // --- Assert: 62 registros totales (2 empleados x 31 días de agosto) ---
@@ -157,14 +173,14 @@ describe('Feature 1: Autogeneración de Patrones (E2E)', () => {
 
     // --- Assert: ciclo correcto de fechas para emp-1 ---
     const casosEsperados: { fecha: string; tipoDia: 'TURNO' | 'DESCANSO'; codigoTurno?: string }[] = [
-      { fecha: '2026-08-04', tipoDia: 'TURNO', codigoTurno: 'DIA' },     // Lunes
-      { fecha: '2026-08-05', tipoDia: 'TURNO', codigoTurno: 'DIA' },     // Martes
-      { fecha: '2026-08-06', tipoDia: 'TURNO', codigoTurno: 'NOCHE' },   // Miércoles
-      { fecha: '2026-08-07', tipoDia: 'TURNO', codigoTurno: 'NOCHE' },   // Jueves
-      { fecha: '2026-08-08', tipoDia: 'DESCANSO' },                      // Viernes
-      { fecha: '2026-08-09', tipoDia: 'DESCANSO' },                      // Sábado
-      { fecha: '2026-08-10', tipoDia: 'DESCANSO' },                      // Domingo
-      { fecha: '2026-08-11', tipoDia: 'TURNO', codigoTurno: 'DIA' },     // Lunes: el ciclo se repite
+      { fecha: fechaISO(addDias(diaInicioCiclo, 0)), tipoDia: 'TURNO', codigoTurno: 'DIA' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 1)), tipoDia: 'TURNO', codigoTurno: 'DIA' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 2)), tipoDia: 'TURNO', codigoTurno: 'NOCHE' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 3)), tipoDia: 'TURNO', codigoTurno: 'NOCHE' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 4)), tipoDia: 'DESCANSO' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 5)), tipoDia: 'DESCANSO' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 6)), tipoDia: 'DESCANSO' },
+      { fecha: fechaISO(addDias(diaInicioCiclo, 7)), tipoDia: 'TURNO', codigoTurno: 'DIA' }, // el ciclo se repite
     ];
 
     for (const empleadoId of ['emp-1', 'emp-2']) {
