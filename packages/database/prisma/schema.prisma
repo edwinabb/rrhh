@@ -46,6 +46,9 @@ model Tenant {
   // Fase 8 — Trabajo fuera de turno
   solicitudesTrabajoAdicional SolicitudTrabajoAdicional[]
 
+  // Fase 9 — Portal de intercambios
+  intercambiosTurno IntercambioTurno[]
+
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
   geofences               Geofence[]
@@ -194,6 +197,10 @@ model Employee {
   // Fase 8 — Trabajo fuera de turno
   solicitudesTrabajoAdicionalSolicitante SolicitudTrabajoAdicional[] @relation("SolicitudTrabajoAdicionalSolicitante")
   solicitudesTrabajoAdicionalAsignado    SolicitudTrabajoAdicional[] @relation("SolicitudTrabajoAdicionalAsignado")
+
+  // Fase 9 — Portal de intercambios
+  intercambiosComoA IntercambioTurno[] @relation("IntercambioTurnoEmpleadoA")
+  intercambiosComoB IntercambioTurno[] @relation("IntercambioTurnoEmpleadoB")
 
   // Fase 2 — Asistencia
   marcaciones         Marcacion[]
@@ -902,6 +909,70 @@ model SolicitudTrabajoAdicional {
   @@index([tenantId, employeeIdAsignado], map: "solicitud_trabajo_adicional_tenant_asignado_idx")
   @@index([tenantId, estado])
   @@map("solicitud_trabajo_adicional")
+}
+
+enum EstadoIntercambioTurno {
+  PENDIENTE_ACEPTACION_B
+  RECHAZADA_POR_B
+  ACEPTADA_POR_B
+  APROBADA_MANAGER
+  RECHAZADA_MANAGER
+  AUTO_APROBADA
+  RECHAZADA_AUTOMATICA
+
+  @@map("estado_intercambio_turno")
+}
+
+enum MotivoResolucionIntercambio {
+  PLAZO_48H
+  FECHA_ALCANZADA
+  FECHA_ALCANZADA_SIN_RESPUESTA_B
+  TURNO_MODIFICADO
+
+  @@map("motivo_resolucion_intercambio")
+}
+
+// Fase 9 — Portal de intercambios autoservicio: Empleado A propone
+// intercambiar su turno con Empleado B en una fecha; B acepta/rechaza;
+// si acepta, el Manager aprueba/rechaza. Si el manager no decide en 48h
+// desde la aceptación de B, o si la fecha del turno llega antes, el
+// sistema resuelve automáticamente (ver IntercambioTurnoAplicadorService).
+model IntercambioTurno {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  employeeIdA String   @map("employee_id_a") @db.Uuid // propone
+  employeeIdB String   @map("employee_id_b") @db.Uuid // recibe la propuesta
+  fecha       DateTime @db.Date
+
+  turnoActualA TipoDiaPlan @map("turno_actual_a") // snapshot al proponer
+  turnoActualB TipoDiaPlan @map("turno_actual_b")
+  mensajeA     String?     @map("mensaje_a") @db.Text
+
+  estado           EstadoIntercambioTurno       @default(PENDIENTE_ACEPTACION_B)
+  motivoRechazo    String?                       @map("motivo_rechazo") @db.Text
+  motivoResolucion MotivoResolucionIntercambio? @map("motivo_resolucion")
+
+  aceptadoEn DateTime? @map("aceptado_en")
+  decididoEn DateTime? @map("decidido_en")
+  // Uuid del manager si decidió una persona; null si resolvió el sistema
+  // (motivoResolucion indica el porqué en ese caso). No es @db.Uuid porque
+  // en la práctica solo se usa como referencia de auditoría, sin FK.
+  decididoPor String? @map("decidido_por") @db.Text
+
+  turnoAsignacionAId String? @map("turno_asignacion_a_id") @db.Uuid
+  turnoAsignacionBId String? @map("turno_asignacion_b_id") @db.Uuid
+
+  creadoEn  DateTime @default(now()) @map("creado_en")
+  creadoPor String   @map("creado_por") @db.Uuid
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  empleadoA Employee @relation("IntercambioTurnoEmpleadoA", fields: [employeeIdA], references: [id], onDelete: Cascade)
+  empleadoB Employee @relation("IntercambioTurnoEmpleadoB", fields: [employeeIdB], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, employeeIdA], map: "intercambio_turno_tenant_a_idx")
+  @@index([tenantId, employeeIdB], map: "intercambio_turno_tenant_b_idx")
+  @@index([tenantId, estado])
+  @@map("intercambio_turno")
 }
 
 enum TipoMovimientoCompensatorio {
