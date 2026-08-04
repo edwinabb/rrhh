@@ -978,11 +978,15 @@ describe('NotificationService', () => {
   it('notificarIntercambioAceptadoPorB: envía email al manager de A vía managerId', async () => {
     const prisma = mockPrisma({
       employee: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) =>
-          where.id === 'emp-a'
-            ? Promise.resolve({ managerId: 'mgr-1', nombres: 'Ana', apellidos: 'Ruiz' })
-            : Promise.resolve({ user: { email: 'mgr@test.com' } }),
-        ),
+        findUnique: jest.fn().mockImplementation(({ where }: any) => {
+          if (where.id === 'emp-a') {
+            return Promise.resolve({ managerId: 'mgr-1', nombres: 'Ana', apellidos: 'Ruiz' });
+          } else if (where.id === 'emp-b') {
+            return Promise.resolve({ nombres: 'Beto', apellidos: 'Soto' });
+          } else {
+            return Promise.resolve({ user: { email: 'mgr@test.com' } });
+          }
+        }),
       },
     });
     const service = new NotificationService(prisma as any);
@@ -991,6 +995,8 @@ describe('NotificationService', () => {
     await service.notificarIntercambioAceptadoPorB('t-1', 'emp-a', 'emp-b', new Date(2026, 8, 10));
 
     expect(enviarEmailSpy).toHaveBeenCalledWith('mgr@test.com', expect.any(String), expect.any(String));
+    const callArgs = enviarEmailSpy.mock.calls[0];
+    expect(callArgs?.[2]).toContain('Beto Soto');
   });
 
   it('notificarIntercambioAceptadoPorB: no lanza si A no tiene manager asignado', async () => {

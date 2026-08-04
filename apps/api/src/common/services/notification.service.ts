@@ -490,10 +490,16 @@ export class NotificationService {
     fecha: Date,
   ): Promise<void> {
     try {
-      const empleadoA = await this.prisma.employee.findUnique({
-        where: { id: employeeIdA },
-        select: { managerId: true, nombres: true, apellidos: true },
-      });
+      const [empleadoA, empleadoB] = await Promise.all([
+        this.prisma.employee.findUnique({
+          where: { id: employeeIdA },
+          select: { managerId: true, nombres: true, apellidos: true },
+        }),
+        this.prisma.employee.findUnique({
+          where: { id: employeeIdB },
+          select: { nombres: true, apellidos: true },
+        }),
+      ]);
 
       if (!empleadoA?.managerId) {
         this.logger.warn(
@@ -502,8 +508,9 @@ export class NotificationService {
         return;
       }
 
-      const nombreEmpleado = [empleadoA.nombres, empleadoA.apellidos].filter(Boolean).join(' ');
-      const mensaje = `Intercambio de turno aceptado entre ${nombreEmpleado || employeeIdA} y su compañero para el ${fecha.toDateString()}. Pendiente de tu aprobación.`;
+      const nombreA = [empleadoA.nombres, empleadoA.apellidos].filter(Boolean).join(' ');
+      const nombreB = [empleadoB?.nombres, empleadoB?.apellidos].filter(Boolean).join(' ');
+      const mensaje = `Intercambio de turno aceptado entre ${nombreA || employeeIdA} y ${nombreB || employeeIdB} para el ${fecha.toDateString()}. Pendiente de tu aprobación.`;
 
       const manager = await this.prisma.employee.findUnique({
         where: { id: empleadoA.managerId },
