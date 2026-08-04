@@ -47,7 +47,7 @@ IntercambioTurno {
 
   aceptadoEn?: DateTime            // cuándo B aceptó — ancla del plazo de 48h
   decididoEn?: DateTime            // cuándo se resolvió el caso (cualquier estado terminal)
-  decididoPor?: string             // userId del manager, o 'SISTEMA' si fue automático
+  decididoPor?: string             // userId del manager si decidió una persona; null si resolvió el sistema (motivoResolucion indica el porqué)
 
   turnoAsignacionAId?: string      // ref auditoría, seteado solo si se ejecutó el swap
   turnoAsignacionBId?: string
