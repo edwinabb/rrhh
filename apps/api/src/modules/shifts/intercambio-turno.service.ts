@@ -119,7 +119,7 @@ export class IntercambioTurnoService {
   }
 
   async aceptar(tx: any, tenantId: string, id: string, employeeIdB: string): Promise<any> {
-    const it = await this.obtenerPendienteDeB(tx, id, employeeIdB);
+    const it = await this.obtenerPendienteDeB(tx, tenantId, id, employeeIdB);
     return tx.intercambioTurno.update({
       where: { id },
       data: { estado: 'ACEPTADA_POR_B', aceptadoEn: new Date() },
@@ -127,7 +127,7 @@ export class IntercambioTurnoService {
   }
 
   async rechazarPorB(tx: any, tenantId: string, id: string, employeeIdB: string, motivoRechazo?: string): Promise<any> {
-    const it = await this.obtenerPendienteDeB(tx, id, employeeIdB);
+    const it = await this.obtenerPendienteDeB(tx, tenantId, id, employeeIdB);
     return tx.intercambioTurno.update({
       where: { id },
       data: {
@@ -139,9 +139,9 @@ export class IntercambioTurnoService {
     });
   }
 
-  private async obtenerPendienteDeB(tx: any, id: string, employeeIdB: string): Promise<any> {
+  private async obtenerPendienteDeB(tx: any, tenantId: string, id: string, employeeIdB: string): Promise<any> {
     const it = await tx.intercambioTurno.findUnique({ where: { id } });
-    if (!it) {
+    if (!it || it.tenantId !== tenantId) {
       throw new NotFoundException(`Intercambio ${id} no encontrado`);
     }
     if (it.employeeIdB !== employeeIdB) {

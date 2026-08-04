@@ -182,5 +182,14 @@ describe('IntercambioTurnoService', () => {
       await service.rechazarPorB(tx, 't-1', propuesta.id, 'emp-b');
       await expect(service.aceptar(tx, 't-1', propuesta.id, 'emp-b')).rejects.toThrow(BadRequestException);
     });
+
+    it('aceptar lanza NotFoundException si el intercambio pertenece a otro tenant', async () => {
+      const tx = mockTx();
+      const propuesta = await service.proponer(tx, {
+        tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
+        fecha: FECHA_FUTURA, creadoPor: 'emp-a',
+      });
+      await expect(service.aceptar(tx, 't-OTRO', propuesta.id, 'emp-b')).rejects.toThrow(NotFoundException);
+    });
   });
 });
