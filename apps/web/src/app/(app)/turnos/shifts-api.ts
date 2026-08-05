@@ -464,3 +464,18 @@ export const rechazarIntercambioPorB = async (id: string, motivoRechazo?: string
     await apiFetch(`/turnos/intercambios/${id}/rechazar`, { method: 'PUT', body: JSON.stringify({ motivoRechazo }) }),
     'rechazar el intercambio',
   );
+
+export const listarIntercambiosPendientes = async (): Promise<IntercambioTurno[]> =>
+  ok(await apiFetch('/turnos/intercambios/pendientes'), 'listar los intercambios pendientes');
+
+export const aprobarIntercambio = async (id: string): Promise<IntercambioTurno> =>
+  ok(await apiFetch(`/turnos/intercambios/${id}/aprobar`, { method: 'PUT' }), 'aprobar el intercambio');
+
+export const rechazarIntercambioManager = async (id: string, motivoRechazo?: string): Promise<IntercambioTurno> =>
+  ok(
+    await apiFetch(`/turnos/intercambios/${id}/rechazar-manager`, {
+      method: 'PUT',
+      body: JSON.stringify({ motivoRechazo }),
+    }),
+    'rechazar el intercambio',
+  );
