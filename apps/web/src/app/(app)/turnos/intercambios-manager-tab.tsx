@@ -1,18 +1,31 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/components/auth-context';
 import { EmpleadoResumen, listarEmpleados } from '../vacaciones/vacations-api';
 import {
   IntercambioTurno, listarIntercambiosPendientes, aprobarIntercambio, rechazarIntercambioManager,
 } from './shifts-api';
 
 export function IntercambiosManagerTab() {
+  const { hasPermission } = useAuth();
+  const puedeGestionar = hasPermission('shift.resolve');
+
   const [pendientes, setPendientes] = useState<IntercambioTurno[]>([]);
   const [empleados, setEmpleados] = useState<EmpleadoResumen[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [motivoPorId, setMotivoPorId] = useState<Record<string, string>>({});
+
+  if (!puedeGestionar) {
+    return (
+      <div className="rounded bg-yellow-50 px-4 py-3 text-yellow-800">
+        <p className="font-medium">Acceso denegado</p>
+        <p className="text-sm">No tienes permisos para gestionar intercambios de turno.</p>
+      </div>
+    );
+  }
 
   useEffect(() => {
     refrescar();
