@@ -409,3 +409,58 @@ export const pedirReentregaReporte = async (
     }),
     'pedir la reentrega del reporte',
   );
+
+// ---------------------------------------------------------------------------
+// Portal de Intercambios (Empleado)
+// ---------------------------------------------------------------------------
+
+export type EstadoIntercambio =
+  | 'PENDIENTE_ACEPTACION_B'
+  | 'RECHAZADA_POR_B'
+  | 'ACEPTADA_POR_B'
+  | 'APROBADA_MANAGER'
+  | 'RECHAZADA_MANAGER'
+  | 'AUTO_APROBADA'
+  | 'RECHAZADA_AUTOMATICA';
+
+export interface IntercambioTurno {
+  id: string;
+  employeeIdA: string;
+  employeeIdB: string;
+  fecha: string;
+  turnoActualA: TipoDiaPlan;
+  turnoActualB: TipoDiaPlan;
+  mensajeA?: string | null;
+  estado: EstadoIntercambio;
+  motivoRechazo?: string | null;
+  motivoResolucion?: string | null;
+  aceptadoEn?: string | null;
+  decididoEn?: string | null;
+  creadoEn: string;
+}
+
+export async function proponerIntercambio(input: {
+  employeeIdB: string;
+  fecha: string;
+  mensajeA?: string;
+}): Promise<IntercambioTurno> {
+  return ok(
+    await apiFetch('/turnos/intercambios/proponer', { method: 'POST', body: JSON.stringify(input) }),
+    'proponer el intercambio',
+  );
+}
+
+export const listarMisPropuestasIntercambio = async (): Promise<IntercambioTurno[]> =>
+  ok(await apiFetch('/turnos/intercambios/mis-propuestas'), 'listar mis propuestas');
+
+export const listarPropuestasParaMiIntercambio = async (): Promise<IntercambioTurno[]> =>
+  ok(await apiFetch('/turnos/intercambios/propuestas-para-mi'), 'listar propuestas para mí');
+
+export const aceptarIntercambio = async (id: string): Promise<IntercambioTurno> =>
+  ok(await apiFetch(`/turnos/intercambios/${id}/aceptar`, { method: 'PUT' }), 'aceptar el intercambio');
+
+export const rechazarIntercambioPorB = async (id: string, motivoRechazo?: string): Promise<IntercambioTurno> =>
+  ok(
+    await apiFetch(`/turnos/intercambios/${id}/rechazar`, { method: 'PUT', body: JSON.stringify({ motivoRechazo }) }),
+    'rechazar el intercambio',
+  );
