@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuth } from '@/components/auth-context';
 import { EmpleadoResumen, listarEmpleados } from '../vacaciones/vacations-api';
 import {
@@ -29,6 +29,7 @@ export function IntercambiosEmpleadoTab() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ employeeIdB: '', fecha: '', mensajeA: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const modalHeadingId = useRef('intercambio-form-heading');
 
   useEffect(() => {
     if (!me?.userId) return;
@@ -190,8 +191,8 @@ export function IntercambiosEmpleadoTab() {
           onClick={(e) => e.target === e.currentTarget && !isSaving && setShowModal(false)}
           role="presentation"
         >
-          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg" role="dialog" aria-modal="true">
-            <h2 className="mb-4 text-lg font-semibold">Proponer intercambio de turno</h2>
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg" role="dialog" aria-modal="true" aria-labelledby={modalHeadingId.current}>
+            <h2 id={modalHeadingId.current} className="mb-4 text-lg font-semibold">Proponer intercambio de turno</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700">Empleado</label>
