@@ -34,6 +34,18 @@ function mockTx(overrides: any = {}) {
   };
 }
 
+// EmployeesService mock: delega en ctx.tx.employee.findFirst para que los
+// tests existentes que ya controlan mockTenantContext.tx.employee.findFirst
+// (incluido mockResolvedValue(null) para simular "sin empleado asociado")
+// sigan funcionando sin cambios, ahora que el controller resuelve el
+// empleado de la sesión vía EmployeesService.findByUserId en vez de tocar
+// ctx.tx.employee directamente (ver Group B del review de fase 9).
+function mockEmployeesService(): any {
+  return {
+    findByUserId: jest.fn((ctx: any, userId: string) => ctx.tx.employee.findFirst({ where: { userId } })),
+  };
+}
+
 describe('ShiftsController - Cambios de Turno', () => {
   let controller: ShiftsController;
   let mockSolicitudCambioTurnoService: any;
@@ -71,6 +83,7 @@ describe('ShiftsController - Cambios de Turno', () => {
       {} as any, // notificacion
       {} as any, // intercambios
       {} as any, // intercambiosAplicador
+      mockEmployeesService(),
     );
 
     mockTenantContext = {
@@ -438,6 +451,7 @@ describe('ShiftsController - Patrones', () => {
       {} as any, // notificacion
       {} as any, // intercambios
       {} as any, // intercambiosAplicador
+      {} as any, // employees
     );
 
     mockTenantContext = {
@@ -856,6 +870,7 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
       mockNotificationService,
       {} as any, // intercambios
       {} as any, // intercambiosAplicador
+      mockEmployeesService(),
     );
 
     mockTenantContext = {
@@ -1326,6 +1341,7 @@ describe('ShiftsController - Portal de Intercambios', () => {
       { notificarIntercambioPropuesto: jest.fn(), notificarIntercambioAceptadoPorB: jest.fn(), notificarIntercambioRechazadoPorB: jest.fn() } as any,
       mockIntercambios,
       mockIntercambiosAplicador,
+      mockEmployeesService(),
     );
   });
 

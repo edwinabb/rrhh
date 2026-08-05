@@ -33,4 +33,17 @@ export class EmployeesService {
     // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
     return ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(`SELECT * FROM "${view}"`);
   }
+
+  async findByUserId(ctx: TenantContext, userId: string): Promise<EmployeeListRow | null> {
+    const view = VIEW_BY_ROLE[ctx.pgRole];
+    if (view === null) {
+      return ctx.tx.employee.findFirst({ where: { tenantId: ctx.tenantId!, userId } });
+    }
+    // Identificador de vista viene únicamente del mapa cerrado de arriba, nunca
+    // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
+    const rows = await ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
+      `SELECT * FROM "${view}" WHERE "user_id" = $1`, userId,
+    );
+    return rows[0] ?? null;
+  }
 }

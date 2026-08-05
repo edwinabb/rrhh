@@ -19,6 +19,7 @@ import { SolicitudTrabajoAdicionalAplicadorService } from './solicitud-trabajo-a
 import { IntercambioTurnoService } from './intercambio-turno.service';
 import { IntercambioTurnoAplicadorService } from './intercambio-turno-aplicador.service';
 import { NotificationService } from '../../common/services/notification.service';
+import { EmployeesService } from '../employees/employees.service';
 
 const TIPOS_DIA: readonly TipoDiaPlan[] = ['TURNO', 'DESCANSO', 'DESCANSO_COMPENSATORIO'];
 const TIPOS_MOVIMIENTO: readonly TipoMovimientoCompensatorio[] = ['GANADO', 'AJUSTE_INICIAL'];
@@ -60,6 +61,7 @@ export class ShiftsController {
     private readonly notificacion: NotificationService,
     private readonly intercambios: IntercambioTurnoService,
     private readonly intercambiosAplicador: IntercambioTurnoAplicadorService,
+    private readonly employees: EmployeesService,
   ) {}
 
   private filtrarMotivoRechazoParaNoManagers(
@@ -235,7 +237,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const empleadoA = await ctx.tx.employee.findFirst({ where: { userId } });
+    const empleadoA = await this.employees.findByUserId(ctx, userId);
     if (!empleadoA) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -267,7 +269,7 @@ export class ShiftsController {
   async listarMisPropuestasIntercambio(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    const empleado = await this.employees.findByUserId(ctx, userId);
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -280,7 +282,7 @@ export class ShiftsController {
   async listarPropuestasParaMiIntercambio(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    const empleado = await this.employees.findByUserId(ctx, userId);
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -293,7 +295,7 @@ export class ShiftsController {
   async aceptarIntercambio(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    const empleado = await this.employees.findByUserId(ctx, userId);
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -316,7 +318,7 @@ export class ShiftsController {
   async rechazarIntercambioPorB(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    const empleado = await this.employees.findByUserId(ctx, userId);
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -349,7 +351,7 @@ export class ShiftsController {
   async aprobarIntercambio(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -361,7 +363,7 @@ export class ShiftsController {
   async rechazarIntercambioManager(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -388,7 +390,7 @@ export class ShiftsController {
   async miPlan(@Query('desde') desde: string, @Query('hasta') hasta: string) {
     const ctx = getTenantContext();
     const { userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -406,7 +408,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -451,7 +453,7 @@ export class ShiftsController {
   async listarMisSolicitudesCambio(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -564,7 +566,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -602,7 +604,7 @@ export class ShiftsController {
   async listarMisSolicitudesTrabajoAdicional(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -660,7 +662,7 @@ export class ShiftsController {
   async aprobarTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -681,7 +683,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -700,7 +702,7 @@ export class ShiftsController {
   async rechazarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -727,7 +729,7 @@ export class ShiftsController {
     const tienePermisoManage = permissions.includes('shift.manage');
     if (!tienePermisoManage) {
       const { userId } = requireIdentity(ctx);
-      const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+      const employee = await this.employees.findByUserId(ctx, userId);
       const esParticipante =
         !!employee &&
         (solicitud.employeeIdSolicitante === employee.id || solicitud.employeeIdAsignado === employee.id);
@@ -747,7 +749,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -782,7 +784,7 @@ export class ShiftsController {
   async validarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -800,7 +802,7 @@ export class ShiftsController {
   async rechazarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }

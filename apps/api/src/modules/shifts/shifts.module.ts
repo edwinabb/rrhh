@@ -14,10 +14,11 @@ import { IntercambioTurnoService } from './intercambio-turno.service';
 import { IntercambioTurnoAplicadorService } from './intercambio-turno-aplicador.service';
 import { AttendanceModule } from '../attendance/attendance.module';
 import { NormativeParamsModule } from '../normative-params/normative-params.module';
+import { EmployeesModule } from '../employees/employees.module';
 import { NotificationService } from '../../common/services/notification.service';
 
 @Module({
-  imports: [AttendanceModule, NormativeParamsModule],
+  imports: [AttendanceModule, NormativeParamsModule, EmployeesModule],
   controllers: [ShiftsController],
   providers: [
     ShiftPlanService,
