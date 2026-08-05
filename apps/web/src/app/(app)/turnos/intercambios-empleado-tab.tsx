@@ -203,7 +203,7 @@ export function IntercambiosEmpleadoTab() {
                   className="mt-1 block w-full rounded border border-slate-300 px-3 py-2"
                 >
                   <option value="">— Seleccionar —</option>
-                  {empleados.filter((e) => e.id !== me?.userId).map((emp) => (
+                  {empleados.filter((e) => e.userId !== me?.userId).map((emp) => (
                     <option key={emp.id} value={emp.id}>{emp.nombres} {emp.apellidos}</option>
                   ))}
                 </select>

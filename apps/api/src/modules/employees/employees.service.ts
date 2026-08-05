@@ -31,7 +31,9 @@ export class EmployeesService {
     }
     // Identificador de vista viene únicamente del mapa cerrado de arriba, nunca
     // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
-    return ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(`SELECT * FROM "${view}"`);
+    return ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
+      `SELECT *, "user_id" AS "userId" FROM "${view}"`,
+    );
   }
 
   async findByUserId(ctx: TenantContext, userId: string): Promise<EmployeeListRow | null> {
@@ -42,7 +44,7 @@ export class EmployeesService {
     // Identificador de vista viene únicamente del mapa cerrado de arriba, nunca
     // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
     const rows = await ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
-      `SELECT * FROM "${view}" WHERE "user_id" = $1`, userId,
+      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "user_id" = $1`, userId,
     );
     return rows[0] ?? null;
   }
