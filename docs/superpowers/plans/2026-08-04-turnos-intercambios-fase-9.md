@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Estado de ejecución (2026-08-04):** Tasks 1-3/9 completas (revisadas, con 1 fix round cada una — ver ledger en `.superpowers/sdd/2026-08-04-turnos-intercambios-fase-9/progress.md` para el detalle). Ejecutándose en el worktree `.worktrees/feat-turnos-intercambios-fase-9`, rama `feat/turnos-intercambios-fase-9`. En curso: Task 4.
+
 **Goal:** Implement Feature 4 (Portal de Intercambios) — Empleado A propone intercambiar su turno con Empleado B en una fecha; B acepta/rechaza; si acepta, el Manager aprueba/rechaza, salvo que pasen 48h sin decisión o llegue la fecha del turno, en cuyo caso el sistema resuelve automáticamente.
 
 **Architecture:** Mismo patrón que Sprints 6-8 en `apps/api/src/modules/shifts/`: un modelo Prisma con RLS, un servicio CRUD (`IntercambioTurnoService`) para las transiciones que decide un humano (proponer/aceptar/rechazar de B), un servicio de orquestación (`IntercambioTurnoAplicadorService`) para las decisiones del manager y el barrido perezoso de resoluciones automáticas, endpoints REST con `@RequirePermission`, notificaciones no bloqueantes, y 2 tabs de frontend (empleado y manager) en `/turnos`. El swap real de `turnoAsignacion` reusa `CompensatorioService.intercambiar()` (Fase 5), sin modificarlo.
@@ -39,7 +41,7 @@ Aplica a todas las tareas de este plan:
 **Interfaces:**
 - Produces: modelo `IntercambioTurno` (tabla `intercambio_turno`), enums `EstadoIntercambioTurno` y `MotivoResolucionIntercambio`, campo `Tenant.intercambiosTurno`, campos `Employee.intercambiosComoA`/`Employee.intercambiosComoB`.
 
-- [ ] **Step 1: Agregar los enums y el modelo a `schema.prisma`**
+- [x] **Step 1: Agregar los enums y el modelo a `schema.prisma`**
 
 Insertar después del modelo `SolicitudTrabajoAdicional` (línea ~905, justo antes de `enum TipoMovimientoCompensatorio`):
 
@@ -124,7 +126,7 @@ Agregar las 2 relaciones inversas en `Employee` (junto a las de `SolicitudTrabaj
   intercambiosComoB IntercambioTurno[] @relation("IntercambioTurnoEmpleadoB")
 ```
 
-- [ ] **Step 2: Generar el esqueleto de migración**
+- [x] **Step 2: Generar el esqueleto de migración**
 
 Con la BD local levantada (`docker-compose up -d` desde la raíz del repo si no está corriendo):
 
@@ -134,7 +136,7 @@ pnpm --filter @rrhh/database exec prisma migrate dev --name intercambio_turno --
 
 Esto crea `packages/database/prisma/migrations/<timestamp>_intercambio_turno/migration.sql` con los `CREATE TYPE`/`CREATE TABLE`/`CREATE INDEX`/`AddForeignKey` generados a partir del schema.
 
-- [ ] **Step 3: Agregar RLS, grants y audit trigger al final del `migration.sql` generado**
+- [x] **Step 3: Agregar RLS, grants y audit trigger al final del `migration.sql` generado**
 
 ```sql
 -- RLS (Row Level Security) for multi-tenant isolation
@@ -155,7 +157,7 @@ CREATE TRIGGER "intercambio_turno_audit" AFTER INSERT OR UPDATE OR DELETE ON "in
 
 Nota: a diferencia de `solicitud_trabajo_adicional` (donde `app_employee` solo tiene SELECT/INSERT), aquí `app_employee` necesita también UPDATE porque el propio Empleado B (que actúa con el rol/permiso de empleado) es quien ejecuta `aceptar`/`rechazar` sobre una fila que no creó él.
 
-- [ ] **Step 4: Aplicar la migración y regenerar el cliente Prisma**
+- [x] **Step 4: Aplicar la migración y regenerar el cliente Prisma**
 
 ```bash
 pnpm --filter @rrhh/database exec prisma migrate dev
@@ -164,7 +166,7 @@ pnpm --filter @rrhh/database exec prisma generate
 
 Verificar: `pnpm --filter @rrhh/api exec tsc --noEmit` debe seguir en 0 errores (el cliente Prisma regenerado ya expone `tx.intercambioTurno`).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/database/prisma/schema.prisma packages/database/prisma/migrations
@@ -187,7 +189,7 @@ git commit -m "feat(turnos-fase-9): modelo IntercambioTurno + RLS + migration"
   - `ProponerIntercambioInput { tenantId, employeeIdA, employeeIdB, fecha: Date, mensajeA?: string, creadoPor: string }`
   - `class IntercambioTurnoService { proponer(tx, input): Promise<any>; listarMisPropuestas(tx, tenantId, employeeIdA): Promise<any[]>; listarPropuestasParaMi(tx, tenantId, employeeIdB): Promise<any[]>; obtener(tx, id): Promise<any|null>; aceptar(tx, tenantId, id, employeeIdB): Promise<any>; rechazarPorB(tx, tenantId, id, employeeIdB, motivoRechazo?): Promise<any> }`
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 ```typescript
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
@@ -377,7 +379,7 @@ describe('IntercambioTurnoService', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
 
 ```bash
 pnpm --filter @rrhh/api test -- intercambio-turno.service.spec
@@ -385,7 +387,7 @@ pnpm --filter @rrhh/api test -- intercambio-turno.service.spec
 
 Esperado: FAIL — `Cannot find module './intercambio-turno.service'`.
 
-- [ ] **Step 3: Implementar `IntercambioTurnoService`**
+- [x] **Step 3: Implementar `IntercambioTurnoService`**
 
 ```typescript
 import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
@@ -547,7 +549,7 @@ export class IntercambioTurnoService {
 }
 ```
 
-- [ ] **Step 4: Ejecutar y verificar que pasan**
+- [x] **Step 4: Ejecutar y verificar que pasan**
 
 ```bash
 pnpm --filter @rrhh/api test -- intercambio-turno.service.spec
@@ -555,7 +557,7 @@ pnpm --filter @rrhh/api test -- intercambio-turno.service.spec
 
 Esperado: PASS, 12/12.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/modules/shifts/intercambio-turno.service.ts apps/api/src/modules/shifts/intercambio-turno.service.spec.ts
@@ -581,7 +583,7 @@ git commit -m "feat(turnos-fase-9): CRUD service IntercambioTurno (proponer/acep
   - `notificarIntercambioAprobado(tenantId: string, employeeIdA: string, employeeIdB: string, fecha: Date, fueAutomatico: boolean): Promise<void>`
   - `notificarIntercambioRechazado(tenantId: string, employeeIdA: string, employeeIdB: string, motivoRechazo?: string | null): Promise<void>`
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 Agregar al final de `notification.service.spec.ts` (antes del cierre del `describe('NotificationService', ...)`):
 
@@ -679,7 +681,7 @@ Agregar al final de `notification.service.spec.ts` (antes del cierre del `descri
   });
 ```
 
-- [ ] **Step 2: Ejecutar y verificar que fallan**
+- [x] **Step 2: Ejecutar y verificar que fallan**
 
 ```bash
 pnpm --filter @rrhh/api test -- notification.service.spec
@@ -687,7 +689,7 @@ pnpm --filter @rrhh/api test -- notification.service.spec
 
 Esperado: FAIL — `service.notificarIntercambioPropuesto is not a function`.
 
-- [ ] **Step 3: Implementar los 5 métodos**
+- [x] **Step 3: Implementar los 5 métodos**
 
 Agregar al final de la clase `NotificationService`, antes de `enviarEmail`:
 
@@ -890,7 +892,7 @@ Agregar al final de la clase `NotificationService`, antes de `enviarEmail`:
   }
 ```
 
-- [ ] **Step 4: Ejecutar y verificar que pasan**
+- [x] **Step 4: Ejecutar y verificar que pasan**
 
 ```bash
 pnpm --filter @rrhh/api test -- notification.service.spec
@@ -898,7 +900,7 @@ pnpm --filter @rrhh/api test -- notification.service.spec
 
 Esperado: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/api/src/common/services/notification.service.ts apps/api/src/common/services/notification.service.spec.ts

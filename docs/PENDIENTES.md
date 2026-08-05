@@ -1,6 +1,6 @@
 # Pendientes y Plan de Trabajo
 
-**Actualizado:** 2026-08-04 (Sprint 8 cerrado, v1.4.0) · **Estado del sistema:** todo verde — 498 tests pass, 0 errores TypeScript, Sprint 6 ✅ (Feature 1 Patrones) + Sprint 7 ✅ (Feature 2 Cambios) + Sprint 8 ✅ (Feature 3 Trabajo Fuera de Turno) — 3/4 features completadas.
+**Actualizado:** 2026-08-04 (Sprint 9 en progreso) · **Estado del sistema:** todo verde en `master` (498 tests, 0 errores TypeScript) — Sprint 6 ✅ (Feature 1 Patrones) + Sprint 7 ✅ (Feature 2 Cambios) + Sprint 8 ✅ (Feature 3 Trabajo Fuera de Turno) + Sprint 9 🔄 (Feature 4 Intercambios, 3/9 tareas) — 3/4 features completadas, la 4ta en curso.
 
 ---
 
@@ -14,7 +14,7 @@
 1. **✅ Sprint 6 - Patrones de Rotación (COMPLETO):** Manager define patrón recurrente (ej: 2 DIA + 2 NOCHE + 3 DESC) e inyecta masivamente al plan. 9/9 tareas completadas (2026-07-30). Feature: catálogo de patrones + aplicador con preview editable + notificaciones + E2E testing. Tests: 328/328 pass. PR merged.
 2. **✅ Sprint 7 - Cambios de Turno (COMPLETO):** Empleado solicita cambio → Manager aprueba/rechaza → reintentos permitidos. 9/9 tareas completadas (2026-07-30). Modelo + CRUD + lógica transaccional + 5 endpoints API + tab "Mis Cambios" (empleado) + tablero Kanban (manager) + notificaciones + E2E testing. Tests: 391/391 pass. v1.3.0.
 3. **✅ Sprint 8 - Trabajo Fuera de Turno (COMPLETO):** Empleado reporta trabajo extra (tarea + fotos + timestamp) → Manager valida → genera compensatorio automáticamente. Datos privados (Manager-only: causaHorasExtras, horasAcumuladas, saldoCompensatorios). 9/9 tareas completadas (2026-07-30 a 2026-08-01). Modelo `SolicitudTrabajoAdicional` + RLS + migration, CRUD + report service, orquestación (aprobar/reasignar/rechazar solicitud + validar/rechazar reporte, incl. creación automática de movimiento GANADO en el libro de compensatorios), 11 endpoints con RBAC, tab empleado (Solicitar + Mis Trabajos), tab manager (Pendientes + Validar), 7 métodos de notificación, E2E integration test (70 assertions). Tests: 498/498 pass (0 fallas, 0 errores TypeScript). Commits: `02c647c..a9f47a3` (11, uno de ellos fix-round de nombres de índice). Branch: `feat/turnos-trabajo-extra-fase-8`.
-4. **⏳ Sprint 9 - Portal de Intercambios (SIGUIENTE):** Empleados negocian peer-to-peer (empleado A ↔ B) → Manager aprueba. Intercambios neutrales para compensatorios. ~15 tareas estimadas. Referencia de arquitectura: réplicar patrón de Sprints 6-8 (subagent-driven-development, 1 implementador + revisor por tarea).
+4. **🔄 Sprint 9 - Portal de Intercambios (EN PROGRESO, 3/9 tareas):** Empleado A propone intercambiar turno con Empleado B → B acepta/rechaza → Manager aprueba/rechaza, salvo que pasen 48h sin decisión o llegue la fecha del turno (el sistema resuelve automáticamente en esos casos — ver diseño). Diseño: `docs/superpowers/specs/2026-08-04-turnos-intercambios-fase-9-design.md`. Plan: `docs/superpowers/plans/2026-08-04-turnos-intercambios-fase-9.md`. Ejecución vía subagent-driven-development en worktree `.worktrees/feat-turnos-intercambios-fase-9` (rama `feat/turnos-intercambios-fase-9`, a diferencia de Sprints 6-8 que trabajaron directo en `master`). Completadas: Task 1 (modelo `IntercambioTurno` + RLS + migration), Task 2 (`IntercambioTurnoService`: proponer/aceptar/rechazarPorB, con fix de aislamiento tenantId), Task 3 (5 métodos de notificación, con fix para incluir el nombre de B en el mensaje al manager). Ledger de progreso: `.superpowers/sdd/2026-08-04-turnos-intercambios-fase-9/progress.md` (dentro del worktree). Siguiente: Task 4 (orquestación + barrido perezoso).
 
 **Principios:**
 - Independencia: ciclos separados, permisos RBAC distintos, parallelizable
@@ -29,16 +29,16 @@
 ## 📌 Próximos pasos inmediatos
 
 - **Sprint 8 cerrado (2026-08-04):** los 11 commits (`02c647c..bbd144f`) ya vivían directamente en `master` (no hubo rama/PR separada — se trabajó ahí desde el inicio), así que no hizo falta merge. Se hizo el bump de versión a `v1.4.0` + commit `release:` + tag, y se limpió el directorio huérfano `.worktrees/feat-turnos-trabajo-extra-fase-8` (no era un worktree registrado, solo quedaba el directorio vacío en disco).
-- `master` está adelante de `origin/master` — falta `git push` cuando se confirme.
-- Sprint 9 (Feature 4: Portal de Intercambios) es el siguiente en la cola — última feature de autoservicio de Fases 6-9 (empleado A ↔ empleado B negocian intercambio de turno, Manager aprueba). Usar el mismo plan/worktree pattern que Sprints 6-8 (`docs/superpowers/plans/`, ledger en `.superpowers/sdd/`). El spec (`docs/superpowers/specs/2026-07-18-turnos-mejoras-phase-6-9.md`, sección 5) ya tiene modelo `IntercambioTurno` + 7 endpoints + roles definidos.
+- `master` está al día con `origin/master` (push + tag `v1.4.0` ya hechos).
+- **Sprint 9 (Feature 4: Portal de Intercambios) en progreso** — 3/9 tareas completas vía subagent-driven-development en el worktree `.worktrees/feat-turnos-intercambios-fase-9` (rama `feat/turnos-intercambios-fase-9`). Diseño y plan ya escritos y aprobados (ver sección de arriba). Siguiente: Task 4 (orquestación + barrido perezoso de resolución automática por 48h/fecha alcanzada).
 
-### 🗓️ Plan para retomar Sprint 9
+### 🗓️ Retomar Sprint 9 (si se corta la sesión)
 
-1. **Arrancar Sprint 9 (Feature 4: Portal de Intercambios):**
-   - Sesión de brainstorming/diseño (spec) antes de escribir el plan de implementación por tareas — mismo flujo que Sprint 8 (`docs/superpowers/specs/2026-07-18-turnos-mejoras-phase-6-9.md` ya tiene la sección de Intercambios como punto de partida, sección correspondiente a Feature 4).
-   - Puntos a definir en el diseño: modelo de "propuesta" A↔B (¿quién inicia, quién confirma?), neutralidad para el libro de compensatorios (un intercambio no debería generar movimientos GANADO/GOZADO, solo reasignar `turnoAsignacion` — ver `CompensatorioService.intercambiar()` que ya existe desde Fase 5 y podría reutilizarse en vez de construirse desde cero), rol del manager (¿aprueba siempre o solo si hay conflicto?).
-   - Crear worktree `.worktrees/feat-turnos-intercambios-fase-9` desde `master`.
-2. **Si sobra tiempo:** retomar el punto 1 de "Plan de integración post-turnos" (exportes de nómina a la BD real) — es el ítem de mayor valor pendiente fuera del módulo de turnos.
+1. Entrar al worktree: `cd .worktrees/feat-turnos-intercambios-fase-9` (rama `feat/turnos-intercambios-fase-9`).
+2. Leer el ledger `.superpowers/sdd/2026-08-04-turnos-intercambios-fase-9/progress.md` para ver qué tareas están `complete` — no re-despachar esas.
+3. Continuar con `superpowers:subagent-driven-development` desde la primera tarea sin línea `complete` en el ledger (Task 4 al momento de este commit).
+4. Al terminar las 9 tareas: revisión final de rama, luego `superpowers:finishing-a-development-branch` para decidir merge/PR a `master` y bump de versión (`v1.5.0`, 4/4 features de Fases 6-9 completadas).
+5. **Si sobra tiempo tras Sprint 9:** retomar el punto 1 de "Plan de integración post-turnos" (exportes de nómina a la BD real) — es el ítem de mayor valor pendiente fuera del módulo de turnos.
 
 ---
 
