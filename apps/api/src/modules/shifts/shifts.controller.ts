@@ -16,6 +16,8 @@ import { SolicitudCambioTurnoService } from './solicitud-cambio-turno.service';
 import { SolicitudCambioTurnoAplicadorService } from './solicitud-cambio-turno-aplicador.service';
 import { SolicitudTrabajoAdicionalService } from './solicitud-trabajo-adicional.service';
 import { SolicitudTrabajoAdicionalAplicadorService } from './solicitud-trabajo-adicional-aplicador.service';
+import { IntercambioTurnoService } from './intercambio-turno.service';
+import { IntercambioTurnoAplicadorService } from './intercambio-turno-aplicador.service';
 import { NotificationService } from '../../common/services/notification.service';
 
 const TIPOS_DIA: readonly TipoDiaPlan[] = ['TURNO', 'DESCANSO', 'DESCANSO_COMPENSATORIO'];
@@ -56,6 +58,8 @@ export class ShiftsController {
     private readonly solicitudTrabajoAdicional: SolicitudTrabajoAdicionalService,
     private readonly solicitudTrabajoAdicionalAplicador: SolicitudTrabajoAdicionalAplicadorService,
     private readonly notificacion: NotificationService,
+    private readonly intercambios: IntercambioTurnoService,
+    private readonly intercambiosAplicador: IntercambioTurnoAplicadorService,
   ) {}
 
   private filtrarMotivoRechazoParaNoManagers(
@@ -220,6 +224,148 @@ export class ShiftsController {
   async libro(@Param('employeeId') employeeId: string) {
     const ctx = getTenantContext();
     return this.compensatorios.obtenerLibro(ctx.tx, employeeId);
+  }
+
+  // --- Portal de intercambios autoservicio (fase 9) ---
+  @Post('intercambios/proponer')
+  @RequirePermission('shift.read')
+  async proponerIntercambio(@Req() request: Request, @Body() dto: any) {
+    if (!dto?.employeeIdB || !dto?.fecha) {
+      throw new BadRequestException('employeeIdB y fecha son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleadoA = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!empleadoA) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    const fecha = parseFecha(dto.fecha, 'fecha');
+    const intercambio = await this.intercambios.proponer(ctx.tx, {
+      tenantId,
+      employeeIdA: empleadoA.id,
+      employeeIdB: dto.employeeIdB,
+      fecha,
+      mensajeA: dto.mensajeA,
+      creadoPor: userId,
+    });
+
+    try {
+      await this.notificacion.notificarIntercambioPropuesto(
+        tenantId, empleadoA.id, dto.employeeIdB, fecha, dto.mensajeA,
+      );
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return intercambio;
+  }
+
+  @Get('intercambios/mis-propuestas')
+  @RequirePermission('shift.read')
+  async listarMisPropuestasIntercambio(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    return this.intercambios.listarMisPropuestas(ctx.tx, tenantId, empleado.id);
+  }
+
+  @Get('intercambios/propuestas-para-mi')
+  @RequirePermission('shift.read')
+  async listarPropuestasParaMiIntercambio(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    return this.intercambios.listarPropuestasParaMi(ctx.tx, tenantId, empleado.id);
+  }
+
+  @Put('intercambios/:id/aceptar')
+  @RequirePermission('shift.read')
+  async aceptarIntercambio(@Req() request: Request, @Param('id') id: string) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    const intercambio = await this.intercambios.aceptar(ctx.tx, tenantId, id, empleado.id);
+
+    try {
+      await this.notificacion.notificarIntercambioAceptadoPorB(
+        tenantId, intercambio.employeeIdA, intercambio.employeeIdB, intercambio.fecha,
+      );
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return intercambio;
+  }
+
+  @Put('intercambios/:id/rechazar')
+  @RequirePermission('shift.read')
+  async rechazarIntercambioPorB(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    const intercambio = await this.intercambios.rechazarPorB(ctx.tx, tenantId, id, empleado.id, dto?.motivoRechazo);
+
+    try {
+      await this.notificacion.notificarIntercambioRechazadoPorB(tenantId, intercambio.employeeIdA, dto?.motivoRechazo);
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return intercambio;
+  }
+
+  @Get('intercambios/pendientes')
+  @RequirePermission('shift.resolve')
+  async listarIntercambiosPendientes(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    return ctx.tx.intercambioTurno.findMany({
+      where: { tenantId, estado: 'ACEPTADA_POR_B' },
+      orderBy: { aceptadoEn: 'asc' },
+    });
+  }
+
+  @Put('intercambios/:id/aprobar')
+  @RequirePermission('shift.resolve')
+  async aprobarIntercambio(@Req() request: Request, @Param('id') id: string) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    return this.intercambiosAplicador.aprobar(ctx.tx, tenantId, id, manager.id);
+  }
+
+  @Put('intercambios/:id/rechazar-manager')
+  @RequirePermission('shift.resolve')
+  async rechazarIntercambioManager(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    return this.intercambiosAplicador.rechazarManager(ctx.tx, tenantId, id, manager.id, dto?.motivoRechazo);
   }
 
   // --- Cumplimiento ---

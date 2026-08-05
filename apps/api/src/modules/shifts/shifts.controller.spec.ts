@@ -69,6 +69,8 @@ describe('ShiftsController - Cambios de Turno', () => {
       {} as any, // solicitudTrabajoAdicional
       {} as any, // solicitudTrabajoAdicionalAplicador
       {} as any, // notificacion
+      {} as any, // intercambios
+      {} as any, // intercambiosAplicador
     );
 
     mockTenantContext = {
@@ -434,6 +436,8 @@ describe('ShiftsController - Patrones', () => {
       {} as any, // solicitudTrabajoAdicional
       {} as any, // solicitudTrabajoAdicionalAplicador
       {} as any, // notificacion
+      {} as any, // intercambios
+      {} as any, // intercambiosAplicador
     );
 
     mockTenantContext = {
@@ -850,6 +854,8 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
       mockSolicitudTrabajoAdicionalService,
       mockSolicitudTrabajoAdicionalAplicadorService,
       mockNotificationService,
+      {} as any, // intercambios
+      {} as any, // intercambiosAplicador
     );
 
     mockTenantContext = {
@@ -1283,5 +1289,86 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
         controller.rechazarReporteTrabajoAdicional(mockManagerRequest, 'sta-1', { motivo: 'X' })
       ).rejects.toThrow('La sesión no tiene un empleado asociado');
     });
+  });
+});
+
+describe('ShiftsController - Portal de Intercambios', () => {
+  let controller: ShiftsController;
+  let mockIntercambios: any;
+  let mockIntercambiosAplicador: any;
+  let mockRequestEmpleado: any;
+  let mockRequestManager: any;
+
+  beforeEach(() => {
+    mockTenantContext = { tenantId: 't-1', userId: 'u-a', tx: mockTx({
+      employee: { findFirst: jest.fn().mockResolvedValue({ id: 'emp-a' }) },
+    }) };
+
+    mockIntercambios = {
+      proponer: jest.fn(),
+      listarMisPropuestas: jest.fn(),
+      listarPropuestasParaMi: jest.fn(),
+      aceptar: jest.fn(),
+      rechazarPorB: jest.fn(),
+    };
+    mockIntercambiosAplicador = {
+      barrido: jest.fn().mockResolvedValue(undefined),
+      aprobar: jest.fn(),
+      rechazarManager: jest.fn(),
+    };
+
+    mockRequestEmpleado = { session: { permissions: ['shift.read'] } };
+    mockRequestManager = { session: { permissions: ['shift.resolve'] } };
+
+    controller = new ShiftsController(
+      {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any,
+      { notificarIntercambioPropuesto: jest.fn(), notificarIntercambioAceptadoPorB: jest.fn(), notificarIntercambioRechazadoPorB: jest.fn() } as any,
+      mockIntercambios,
+      mockIntercambiosAplicador,
+    );
+  });
+
+  it('POST proponer: crea la propuesta y notifica a B', async () => {
+    mockIntercambios.proponer.mockResolvedValue({ id: 'int-1', employeeIdB: 'emp-b' });
+    const dto = { employeeIdB: 'emp-b', fecha: '2026-09-10', mensajeA: 'Tengo cita' };
+
+    const resultado = await controller.proponerIntercambio(mockRequestEmpleado, dto);
+
+    expect(mockIntercambios.proponer).toHaveBeenCalled();
+    expect(resultado.id).toBe('int-1');
+  });
+
+  it('POST proponer: 400 si falta employeeIdB o fecha', async () => {
+    await expect(controller.proponerIntercambio(mockRequestEmpleado, { fecha: '2026-09-10' })).rejects.toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('GET mis-propuestas: delega en el service con el employeeId resuelto', async () => {
+    mockIntercambios.listarMisPropuestas.mockResolvedValue([]);
+    await controller.listarMisPropuestasIntercambio(mockRequestEmpleado);
+    expect(mockIntercambios.listarMisPropuestas).toHaveBeenCalledWith(expect.anything(), 't-1', 'emp-a');
+  });
+
+  it('PUT :id/aceptar: corre el barrido antes de aceptar', async () => {
+    mockIntercambios.aceptar.mockResolvedValue({ id: 'int-1', estado: 'ACEPTADA_POR_B', employeeIdA: 'emp-a', employeeIdB: 'emp-a' });
+    await controller.aceptarIntercambio(mockRequestEmpleado, 'int-1');
+    expect(mockIntercambiosAplicador.barrido).toHaveBeenCalledWith(expect.anything(), 't-1');
+    expect(mockIntercambios.aceptar).toHaveBeenCalled();
+  });
+
+  it('PUT :id/aprobar: requiere shift.resolve', async () => {
+    mockIntercambiosAplicador.aprobar.mockResolvedValue({ id: 'int-1', estado: 'APROBADA_MANAGER' });
+    const resultado = await controller.aprobarIntercambio(mockRequestManager, 'int-1');
+    expect(resultado.estado).toBe('APROBADA_MANAGER');
+  });
+
+  it('PUT :id/rechazar-manager: pasa motivoRechazo', async () => {
+    mockIntercambiosAplicador.rechazarManager.mockResolvedValue({ id: 'int-1', estado: 'RECHAZADA_MANAGER' });
+    await controller.rechazarIntercambioManager(mockRequestManager, 'int-1', { motivoRechazo: 'Sin cobertura' });
+    expect(mockIntercambiosAplicador.rechazarManager).toHaveBeenCalledWith(
+      expect.anything(), 't-1', 'int-1', 'emp-a', 'Sin cobertura',
+    );
   });
 });
