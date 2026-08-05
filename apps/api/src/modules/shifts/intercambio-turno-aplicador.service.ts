@@ -51,7 +51,7 @@ export class IntercambioTurnoAplicadorService {
 
   async aprobar(tx: any, tenantId: string, id: string, managerId: string): Promise<any> {
     await this.barrido(tx, tenantId);
-    const it = await this.obtenerAceptadaPorB(tx, id);
+    const it = await this.obtenerAceptadaPorB(tx, tenantId, id);
     return this.ejecutarSwap(tx, it, { decididoPor: managerId, estadoAprobado: 'APROBADA_MANAGER' });
   }
 
@@ -63,7 +63,7 @@ export class IntercambioTurnoAplicadorService {
     motivoRechazo?: string,
   ): Promise<any> {
     await this.barrido(tx, tenantId);
-    const it = await this.obtenerAceptadaPorB(tx, id);
+    const it = await this.obtenerAceptadaPorB(tx, tenantId, id);
     return this.cerrarSinEjecutar(tx, it, undefined, {
       decididoPor: managerId,
       motivoRechazo,
@@ -71,9 +71,9 @@ export class IntercambioTurnoAplicadorService {
     });
   }
 
-  private async obtenerAceptadaPorB(tx: any, id: string): Promise<any> {
+  private async obtenerAceptadaPorB(tx: any, tenantId: string, id: string): Promise<any> {
     const it = await tx.intercambioTurno.findUnique({ where: { id } });
-    if (!it) {
+    if (!it || it.tenantId !== tenantId) {
       throw new NotFoundException(`Intercambio ${id} no encontrado`);
     }
     if (it.estado !== 'ACEPTADA_POR_B') {
