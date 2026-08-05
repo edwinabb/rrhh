@@ -18,19 +18,12 @@ export function IntercambiosManagerTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [motivoPorId, setMotivoPorId] = useState<Record<string, string>>({});
 
-  if (!puedeGestionar) {
-    return (
-      <div className="rounded bg-yellow-50 px-4 py-3 text-yellow-800">
-        <p className="font-medium">Acceso denegado</p>
-        <p className="text-sm">No tienes permisos para gestionar intercambios de turno.</p>
-      </div>
-    );
-  }
-
   useEffect(() => {
+    if (!puedeGestionar) return;
     refrescar();
     listarEmpleados().then(setEmpleados).catch((e) => setError((e as Error).message));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeGestionar]);
 
   async function refrescar() {
     setError(null);
@@ -73,6 +66,15 @@ export function IntercambiosManagerTab() {
       setError((e as Error).message);
     }
   };
+
+  if (!puedeGestionar) {
+    return (
+      <div className="rounded bg-yellow-50 px-4 py-3 text-yellow-800">
+        <p className="font-medium">Acceso denegado</p>
+        <p className="text-sm">No tienes permisos para gestionar intercambios de turno.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 text-sm">
