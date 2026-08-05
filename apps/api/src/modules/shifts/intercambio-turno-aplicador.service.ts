@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { CompensatorioService } from './compensatorio.service';
 import { NotificationService } from '../../common/services/notification.service';
 import type { MotivoResolucionIntercambio } from './intercambio-turno.service';
@@ -14,6 +14,8 @@ const HORAS_PLAZO_MANAGER = 48;
  */
 @Injectable()
 export class IntercambioTurnoAplicadorService {
+  private readonly logger = new Logger(IntercambioTurnoAplicadorService.name);
+
   constructor(
     private readonly compensatorios: CompensatorioService,
     private readonly notificationService: NotificationService,
@@ -27,7 +29,16 @@ export class IntercambioTurnoAplicadorService {
       where: { tenantId, estado: 'PENDIENTE_ACEPTACION_B', fecha: { lte: hoy } },
     });
     for (const it of sinRespuestaB) {
-      await this.cerrarSinEjecutar(tx, it, 'FECHA_ALCANZADA_SIN_RESPUESTA_B');
+      try {
+        await this.cerrarSinEjecutar(tx, it, 'FECHA_ALCANZADA_SIN_RESPUESTA_B');
+      } catch (err) {
+        // Un registro con problemas (FK, permisos, race) no debe abortar el
+        // barrido completo ni la transacción del caller — se loguea y se
+        // sigue con el resto de los registros pendientes.
+        this.logger.error(
+          `barrido: fallo al cerrar sin ejecutar intercambio ${it.id}: ${(err as Error)?.message ?? err}`,
+        );
+      }
     }
 
     const limitePlazo = new Date();
@@ -40,11 +51,19 @@ export class IntercambioTurnoAplicadorService {
       const porFecha = it.fecha <= hoy;
       const porPlazo = !porFecha && it.aceptadoEn && it.aceptadoEn <= limitePlazo;
       if (porFecha || porPlazo) {
-        await this.ejecutarSwap(tx, it, {
-          decididoPor: null,
-          estadoAprobado: 'AUTO_APROBADA',
-          motivoResolucion: porFecha ? 'FECHA_ALCANZADA' : 'PLAZO_48H',
-        });
+        try {
+          await this.ejecutarSwap(tx, it, {
+            decididoPor: null,
+            estadoAprobado: 'AUTO_APROBADA',
+            motivoResolucion: porFecha ? 'FECHA_ALCANZADA' : 'PLAZO_48H',
+          });
+        } catch (err) {
+          // Mismo criterio: aislar el fallo de un registro para no tumbar
+          // el barrido ni el request del endpoint que lo disparó.
+          this.logger.error(
+            `barrido: fallo al ejecutar swap del intercambio ${it.id}: ${(err as Error)?.message ?? err}`,
+          );
+        }
       }
     }
   }
@@ -52,7 +71,13 @@ export class IntercambioTurnoAplicadorService {
   async aprobar(tx: any, tenantId: string, id: string, managerId: string): Promise<any> {
     await this.barrido(tx, tenantId);
     const it = await this.obtenerAceptadaPorB(tx, tenantId, id);
-    return this.ejecutarSwap(tx, it, { decididoPor: managerId, estadoAprobado: 'APROBADA_MANAGER' });
+    const resultado = await this.ejecutarSwap(tx, it, { decididoPor: managerId, estadoAprobado: 'APROBADA_MANAGER' });
+    if (resultado === null) {
+      throw new ConflictException(
+        `El intercambio ${id} ya fue resuelto por otro proceso mientras se procesaba tu decisión`,
+      );
+    }
+    return resultado;
   }
 
   async rechazarManager(
@@ -64,11 +89,17 @@ export class IntercambioTurnoAplicadorService {
   ): Promise<any> {
     await this.barrido(tx, tenantId);
     const it = await this.obtenerAceptadaPorB(tx, tenantId, id);
-    return this.cerrarSinEjecutar(tx, it, undefined, {
+    const resultado = await this.cerrarSinEjecutar(tx, it, undefined, {
       decididoPor: managerId,
       motivoRechazo,
       estado: 'RECHAZADA_MANAGER',
     });
+    if (resultado === null) {
+      throw new ConflictException(
+        `El intercambio ${id} ya fue resuelto por otro proceso mientras se procesaba tu decisión`,
+      );
+    }
+    return resultado;
   }
 
   private async obtenerAceptadaPorB(tx: any, tenantId: string, id: string): Promise<any> {
@@ -98,6 +129,12 @@ export class IntercambioTurnoAplicadorService {
       }),
     ]);
 
+    // TODO(fase-9 review #5): el snapshot de propuesta solo guarda tipoDia
+    // (turnoActualA/B), no el turnoId específico. Si B es reasignado a OTRO
+    // turno que igual sea tipoDia==='TURNO', este chequeo no lo detecta y A
+    // termina swapeado a un turno que nunca aceptó. Arreglo correcto requiere
+    // columnas nuevas (turnoIdActualA/B) + su propia migración — fuera de
+    // alcance de este fix wave, ver docs/PENDIENTES.md (Sprint 9, deuda técnica).
     const turnoModificado = !asigA || !asigB || asigA.tipoDia !== it.turnoActualA || asigB.tipoDia !== it.turnoActualB;
     if (turnoModificado) {
       return this.cerrarSinEjecutar(tx, it, 'TURNO_MODIFICADO');
@@ -111,8 +148,13 @@ export class IntercambioTurnoAplicadorService {
       creadoPor: opts.decididoPor ?? it.employeeIdA,
     });
 
-    const actualizado = await tx.intercambioTurno.update({
-      where: { id: it.id },
+    // Claim-check optimista (hallazgo #4 revisión fase 9): dos requests
+    // concurrentes pueden leer el mismo registro ACEPTADA_POR_B y llegar
+    // ambos hasta acá. El UPDATE condicionado a que el estado siga siendo
+    // el que leímos (it.estado) hace que solo el primero en escribir gane;
+    // el segundo ve count === 0 y no duplica la marca ni la notificación.
+    const claim = await tx.intercambioTurno.updateMany({
+      where: { id: it.id, estado: it.estado },
       data: {
         estado: opts.estadoAprobado,
         motivoResolucion: opts.motivoResolucion ?? null,
@@ -122,6 +164,15 @@ export class IntercambioTurnoAplicadorService {
         turnoAsignacionBId: b.id,
       },
     });
+
+    if (claim.count === 0) {
+      this.logger.warn(
+        `ejecutarSwap: intercambio ${it.id} ya no está en estado '${it.estado}' (resuelto por otro proceso) — se omite marca y notificación`,
+      );
+      return null;
+    }
+
+    const actualizado = await tx.intercambioTurno.findUnique({ where: { id: it.id } });
 
     try {
       await this.notificationService.notificarIntercambioAprobado(
@@ -143,8 +194,10 @@ export class IntercambioTurnoAplicadorService {
     const estado = manual?.estado ?? 'RECHAZADA_AUTOMATICA';
     const motivoRechazo = manual?.motivoRechazo ?? (motivoResolucion ? this.describirMotivo(motivoResolucion) : null);
 
-    const actualizado = await tx.intercambioTurno.update({
-      where: { id: it.id },
+    // Mismo claim-check optimista que en ejecutarSwap (hallazgo #4): el
+    // UPDATE solo aplica si el registro sigue en el estado que leímos.
+    const claim = await tx.intercambioTurno.updateMany({
+      where: { id: it.id, estado: it.estado },
       data: {
         estado,
         motivoResolucion: motivoResolucion ?? null,
@@ -153,6 +206,15 @@ export class IntercambioTurnoAplicadorService {
         decididoEn: new Date(),
       },
     });
+
+    if (claim.count === 0) {
+      this.logger.warn(
+        `cerrarSinEjecutar: intercambio ${it.id} ya no está en estado '${it.estado}' (resuelto por otro proceso) — se omite marca y notificación`,
+      );
+      return null;
+    }
+
+    const actualizado = await tx.intercambioTurno.findUnique({ where: { id: it.id } });
 
     try {
       await this.notificationService.notificarIntercambioRechazado(

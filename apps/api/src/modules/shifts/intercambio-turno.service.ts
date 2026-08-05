@@ -72,6 +72,14 @@ export class IntercambioTurnoService {
       throw new BadRequestException('Ambos empleados deben tener un turno asignado esa fecha');
     }
 
+    // TODO(fase-9 review #7): este chequeo es direccional (solo detecta una
+    // segunda propuesta A→B) y solo a nivel de aplicación — una propuesta
+    // B→A para el mismo par+fecha puede coexistir con esta, y no hay índice
+    // único (ni siquiera parcial) que la respalde, así que también es racy
+    // bajo requests concurrentes. Arreglo correcto: columna pair_key
+    // normalizada (least/greatest de employee_id_a/b) + índice único parcial
+    // sobre estados no terminales — requiere su propia migración, fuera de
+    // alcance de este fix wave. Ver docs/PENDIENTES.md (Sprint 9, deuda técnica).
     const duplicado = await tx.intercambioTurno.findFirst({
       where: {
         tenantId: input.tenantId,

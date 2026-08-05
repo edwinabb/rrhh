@@ -20,6 +20,14 @@ function mockTx(seed: Record<string, any> = {}) {
         intercambios.set(where.id, updated);
         return updated;
       }),
+      updateMany: jest.fn(async ({ where, data }: any) => {
+        const actual = intercambios.get(where.id);
+        if (!actual || actual.estado !== where.estado) {
+          return { count: 0 };
+        }
+        intercambios.set(where.id, { ...actual, ...data });
+        return { count: 1 };
+      }),
     },
     turnoAsignacion: {
       findUnique: jest.fn(async ({ where }: any) => {

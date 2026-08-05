@@ -44,6 +44,14 @@ function createFakeTx() {
         intercambios.set(where.id, updated);
         return updated;
       },
+      updateMany: async ({ where, data }: any) => {
+        const actual = intercambios.get(where.id);
+        if (!actual || actual.estado !== where.estado) {
+          return { count: 0 };
+        }
+        intercambios.set(where.id, { ...actual, ...data });
+        return { count: 1 };
+      },
     },
     employee: {
       findUnique: async ({ where }: any) => employees.get(where.id) ?? null,
