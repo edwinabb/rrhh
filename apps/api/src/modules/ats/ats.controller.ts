@@ -18,12 +18,7 @@ import {
 } from '../../common/database/tenant-request-context';
 import { VacanteService, EstadoVacante } from './vacante.service';
 import { CandidateService, EstadoCandidato } from './candidate.service';
-import {
-  CVParsingService,
-  CvParseado,
-  CvParseError,
-  CvRateLimitError,
-} from './cv-parsing.service';
+// CV parsing removido de MVP (solo formulario manual por ahora)
 
 // ---------------------------------------------------------------------------
 // DTOs (sin class-validator: el proyecto no lo usa; validación mínima manual)
@@ -43,17 +38,12 @@ export class RegistrarCandidatoDto {
   nombreCompleto!: string;
   email!: string;
   telefono?: string;
-  /**
-   * Texto plano del CV (MVP: el CV llega como texto en el body; la subida
-   * del archivo original a MinIO llegará con el módulo documental).
-   */
-  cvTexto!: string;
+  /** Descripción de experiencia/skills (opcional, RR.HH. puede revisar después). */
+  experiencia?: string;
   /** Clave del objeto CV en MinIO; si se omite se genera una clave MVP. */
   cvRutaMinio?: string;
   /** Consentimiento LPDP (Ley 29733) — obligatorio para tratar los datos. */
   consentimientoLpdp!: boolean;
-  /** Idioma esperado del CV para el parsing (default 'es'). */
-  idioma?: string;
 }
 
 export class CambiarEstadoCandidatoDto {
@@ -102,7 +92,6 @@ export class AtsController {
   constructor(
     private readonly vacanteService: VacanteService,
     private readonly candidateService: CandidateService,
-    private readonly cvParsingService: CVParsingService,
   ) {}
 
   /** POST /ats/vacantes — crea una vacante en estado ABIERTA. */
@@ -159,11 +148,8 @@ export class AtsController {
 
   /**
    * POST /ats/vacantes/:id/candidatos — registra un candidato en la vacante.
-   * MVP: el CV llega como texto plano en el body; se parsea con Claude
-   * (CVParsingService) y el resultado se guarda en cvParseado. Si el parsing
-   * falla (CV ilegible o rate limit del tenant), el candidato queda registrado
-   * igualmente con cvParseado = null y se devuelve una advertencia — el
-   * registro del postulante no debe perderse por un fallo del LLM.
+   * MVP: solo formulario manual. Candidato rellena su info, RR.HH. revisa y aprueba.
+   * (CV parsing automático puede agregarse en fase 2+ si se necesita).
    */
   @Post('vacantes/:id/candidatos')
   @RequirePermission('ats.apply')
@@ -174,9 +160,9 @@ export class AtsController {
     const ctx = getTenantContext();
     const { tenantId } = requireIdentity(ctx);
 
-    if (!dto.nombreCompleto || !dto.email || !dto.cvTexto) {
+    if (!dto.nombreCompleto || !dto.email) {
       throw new BadRequestException(
-        'nombreCompleto, email y cvTexto son obligatorios',
+        'nombreCompleto y email son obligatorios',
       );
     }
     if (dto.consentimientoLpdp !== true) {
@@ -185,7 +171,7 @@ export class AtsController {
       );
     }
 
-    // Clave MVP en MinIO mientras el CV llega como texto plano en el body.
+    // Clave MVP en MinIO
     const emailNormalizado = dto.email.trim().toLowerCase();
     const cvRutaMinio =
       dto.cvRutaMinio ??
@@ -201,31 +187,7 @@ export class AtsController {
       consentimientoLpdp: dto.consentimientoLpdp,
     });
 
-    let cvParseado: CvParseado | null = null;
-    let advertencia: string | undefined;
-    try {
-      cvParseado = await this.cvParsingService.parsearCv(
-        tenantId,
-        dto.cvTexto,
-        dto.idioma ?? 'es',
-      );
-    } catch (err) {
-      if (err instanceof CvParseError || err instanceof CvRateLimitError) {
-        advertencia = `CV no parseado automáticamente: ${err.message}`;
-      } else {
-        throw err;
-      }
-    }
-
-    const actualizado = cvParseado
-      ? await ctx.tx.candidato.update({
-          where: { id: candidato.id },
-          // CvParseado es JSON serializable; el cast lo adapta al tipo Json de Prisma
-          data: { cvParseado: cvParseado as unknown as Prisma.InputJsonValue },
-        })
-      : candidato;
-
-    return advertencia ? { ...actualizado, advertencia } : actualizado;
+    return candidato;
   }
 
   /**
