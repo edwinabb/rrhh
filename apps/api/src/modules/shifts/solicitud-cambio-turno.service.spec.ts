@@ -1,6 +1,14 @@
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { SolicitudCambioTurnoService } from './solicitud-cambio-turno.service';
 
+// Helper to generate relative dates
+const addDays = (n: number): Date => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() + n);
+  return date;
+};
+
 function mockTx(overrides: any = {}) {
   return {
     solicitudCambioTurno: {
@@ -38,7 +46,7 @@ describe('SolicitudCambioTurnoService', () => {
     it('happy path: crea solicitud con fechas futuras y sin conflictos', async () => {
       const tx = mockTx();
       tx.turnoAsignacion.findFirst.mockImplementation(({ where }: any) => {
-        if (where.fecha.getTime() === new Date(2026, 7, 5).getTime()) {
+        if (where.fecha.getTime() === addDays(1).getTime()) {
           return Promise.resolve({ turnoId: 'turno-actual' });
         }
         return Promise.resolve(null);
@@ -48,9 +56,9 @@ describe('SolicitudCambioTurnoService', () => {
       const resultado = await service.crearSolicitud(tx, {
         tenantId: TENANT,
         employeeId: EMPLOYEE,
-        fechaActual: new Date(2026, 7, 5),
+        fechaActual: addDays(1),
         turnoIdActual: 'turno-actual',
-        fechaNueva: new Date(2026, 7, 10),
+        fechaNueva: addDays(5),
         turnoIdNuevo: 'turno-nuevo',
         creadoPor: 'u-1',
       });
@@ -67,7 +75,7 @@ describe('SolicitudCambioTurnoService', () => {
           employeeId: EMPLOYEE,
           fechaActual: new Date(2020, 0, 1),
           turnoIdActual: 'turno-actual',
-          fechaNueva: new Date(2026, 7, 10),
+          fechaNueva: addDays(5),
           turnoIdNuevo: 'turno-nuevo',
           creadoPor: 'u-1',
         }),
@@ -82,9 +90,9 @@ describe('SolicitudCambioTurnoService', () => {
         service.crearSolicitud(tx, {
           tenantId: TENANT,
           employeeId: EMPLOYEE,
-          fechaActual: new Date(2026, 7, 5),
+          fechaActual: addDays(1),
           turnoIdActual: 'turno-actual',
-          fechaNueva: new Date(2026, 7, 10),
+          fechaNueva: addDays(5),
           turnoIdNuevo: 'turno-nuevo',
           creadoPor: 'u-1',
         }),
@@ -99,9 +107,9 @@ describe('SolicitudCambioTurnoService', () => {
         service.crearSolicitud(tx, {
           tenantId: TENANT,
           employeeId: EMPLOYEE,
-          fechaActual: new Date(2026, 7, 5),
+          fechaActual: addDays(1),
           turnoIdActual: 'turno-actual',
-          fechaNueva: new Date(2026, 7, 10),
+          fechaNueva: addDays(5),
           turnoIdNuevo: 'turno-nuevo',
           creadoPor: 'u-1',
         }),
@@ -117,9 +125,9 @@ describe('SolicitudCambioTurnoService', () => {
         service.crearSolicitud(tx, {
           tenantId: TENANT,
           employeeId: EMPLOYEE,
-          fechaActual: new Date(2026, 7, 5),
+          fechaActual: addDays(1),
           turnoIdActual: 'turno-actual',
-          fechaNueva: new Date(2026, 7, 10),
+          fechaNueva: addDays(5),
           turnoIdNuevo: 'turno-inexistente',
           creadoPor: 'u-1',
         }),
@@ -129,7 +137,7 @@ describe('SolicitudCambioTurnoService', () => {
     it('rechaza si la fecha nueva ya tiene una asignación de turno (no-DESCANSO)', async () => {
       const tx = mockTx();
       tx.turnoAsignacion.findFirst.mockImplementation(({ where }: any) => {
-        if (where.fecha.getTime() === new Date(2026, 7, 5).getTime()) {
+        if (where.fecha.getTime() === addDays(1).getTime()) {
           return Promise.resolve({ turnoId: 'turno-actual' });
         }
         return Promise.resolve({ turnoId: 'turno-ocupado', tipoDia: 'TURNO' });
@@ -140,9 +148,9 @@ describe('SolicitudCambioTurnoService', () => {
         service.crearSolicitud(tx, {
           tenantId: TENANT,
           employeeId: EMPLOYEE,
-          fechaActual: new Date(2026, 7, 5),
+          fechaActual: addDays(1),
           turnoIdActual: 'turno-actual',
-          fechaNueva: new Date(2026, 7, 10),
+          fechaNueva: addDays(5),
           turnoIdNuevo: 'turno-nuevo',
           creadoPor: 'u-1',
         }),
@@ -212,7 +220,7 @@ describe('SolicitudCambioTurnoService', () => {
         employeeId: EMPLOYEE,
         estado: 'PENDIENTE',
         turnoIdNuevo: 'turno-nuevo',
-        fechaNueva: new Date(2026, 7, 10),
+        fechaNueva: addDays(5),
       });
       tx.turno.findUnique.mockResolvedValue({ id: 'turno-nuevo', tenantId: TENANT });
       tx.turnoAsignacion.findFirst.mockResolvedValue(null);
@@ -237,7 +245,7 @@ describe('SolicitudCambioTurnoService', () => {
         employeeId: EMPLOYEE,
         estado: 'PENDIENTE',
         turnoIdNuevo: null,
-        fechaNueva: new Date(2026, 7, 10),
+        fechaNueva: addDays(5),
       });
 
       const resultado = await service.actualizarEstado(tx, 'sol-1', 'RECHAZADA', 'manager-1', 'No hay cobertura disponible');
@@ -254,7 +262,7 @@ describe('SolicitudCambioTurnoService', () => {
         employeeId: EMPLOYEE,
         estado: 'PENDIENTE',
         turnoIdNuevo: 'turno-nuevo',
-        fechaNueva: new Date(2026, 7, 10),
+        fechaNueva: addDays(5),
       });
       tx.turno.findUnique.mockResolvedValue({ id: 'turno-nuevo', tenantId: TENANT });
       tx.turnoAsignacion.findFirst.mockResolvedValue({ turnoId: 'turno-ocupado', tipoDia: 'TURNO' });

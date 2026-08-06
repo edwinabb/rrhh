@@ -172,6 +172,14 @@ function createFakeTx() {
 }
 
 describe('Feature 2: Cambios de Turno (E2E)', () => {
+  // Helper to generate relative dates (independent of when test runs)
+  const addDays = (n: number): Date => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + n);
+    return date;
+  };
+
   it('Employee solicita cambio, Manager aprueba, verifica side effects, luego retry flow', async () => {
     const tenantId = 't-1';
 
@@ -196,22 +204,26 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       activo: true,
     });
 
-    // --- Setup: Asignaciones iniciales (empleado tiene NOCHE el 2026-08-05) ---
-    turnoAsignaciones.set('t-1|emp-1|2026-08-05', {
+    // --- Setup: Asignaciones iniciales (empleado tiene NOCHE mañana) ---
+    const dateActual = addDays(1);
+    const dateNueva = addDays(5);
+    const dateAlternate = addDays(10);
+
+    turnoAsignaciones.set(`t-1|emp-1|${dateActual.toISOString().slice(0, 10)}`, {
       id: 'asig-1',
       tenantId,
       employeeId: 'emp-1',
-      fecha: new Date(2026, 7, 5),
+      fecha: dateActual,
       tipoDia: 'TURNO',
       turnoId: 'turno-noche',
     });
 
-    // 2026-08-10 está libre (DESCANSO)
-    turnoAsignaciones.set('t-1|emp-1|2026-08-10', {
+    // 5 days from now está libre (DESCANSO)
+    turnoAsignaciones.set(`t-1|emp-1|${dateNueva.toISOString().slice(0, 10)}`, {
       id: 'asig-2',
       tenantId,
       employeeId: 'emp-1',
-      fecha: new Date(2026, 7, 10),
+      fecha: dateNueva,
       tipoDia: 'DESCANSO',
       turnoId: null,
     });
@@ -228,13 +240,13 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       mockNotificationService as any,
     );
 
-    // ===== STEP 1: Employee creates request: change from NOCHE (2026-08-05) to DIA (2026-08-10) =====
+    // ===== STEP 1: Employee creates request: change from NOCHE to DIA =====
     const solicitud1 = await solicitudService.crearSolicitud(tx, {
       tenantId,
       employeeId: 'emp-1',
-      fechaActual: new Date(2026, 7, 5),
+      fechaActual: dateActual,
       turnoIdActual: 'turno-noche',
-      fechaNueva: new Date(2026, 7, 10),
+      fechaNueva: dateNueva,
       turnoIdNuevo: 'turno-dia',
       creadoPor: 'emp-1',
     });
@@ -243,8 +255,8 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     expect(solicitud1.id).toBeDefined();
     expect(solicitud1.estado).toBe('PENDIENTE');
     expect(solicitud1.employeeId).toBe('emp-1');
-    expect(solicitud1.fechaActual).toEqual(new Date(2026, 7, 5));
-    expect(solicitud1.fechaNueva).toEqual(new Date(2026, 7, 10));
+    expect(solicitud1.fechaActual).toEqual(dateActual);
+    expect(solicitud1.fechaNueva).toEqual(dateNueva);
     expect(solicitud1.turnoIdActual).toBe('turno-noche');
     expect(solicitud1.turnoIdNuevo).toBe('turno-dia');
     expect(solicitud1.creadoPor).toBe('emp-1');
@@ -257,12 +269,12 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     // ===== STEP 3: Manager approves solicitud =====
     const aprobada = await aplicadorService.aprobarSolicitud(tx, solicitud1.id, 'mgr-1');
 
-    // ===== STEP 4: Verify turnoAsignacion updated for 2026-08-10 to DIA =====
+    // ===== STEP 4: Verify turnoAsignacion updated =====
     expect(aprobada.estado).toBe('APROBADA');
     expect(aprobada.decididoPor).toBe('mgr-1');
 
-    // Check that turnoAsignacion was upserted: 2026-08-10 should now have TURNO + turno-dia
-    const asigDia = turnoAsignaciones.get('t-1|emp-1|2026-08-10');
+    // Check that turnoAsignacion was upserted
+    const asigDia = turnoAsignaciones.get(`t-1|emp-1|${dateNueva.toISOString().slice(0, 10)}`);
     expect(asigDia).toBeDefined();
     expect(asigDia.tipoDia).toBe('TURNO');
     expect(asigDia.turnoId).toBe('turno-dia');
@@ -271,53 +283,38 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     expect(mockNotificationService.notificarSolicitudAprobada).toHaveBeenCalledWith(
       tenantId,
       'emp-1',
-      new Date(2026, 7, 10),
+      dateNueva,
       'Día',
     );
 
-    // ===== STEP 6: Employee tries to request change for same date again → creates new PENDIENTE =====
-    // But now the fecha nueva (2026-08-10) should be available again if we're requesting a DESCANSO
-    // Let's simulate employee trying to swap back or to a different turno. We'll try requesting
-    // 2026-08-05 (which now should be free) to DESCANSO. Actually, let's do this differently:
-    // Re-assign 2026-08-10 back to DESCANSO temporarily and request to change
-    // 2026-08-05 NOCHE to DIA (different date pattern).
-
-    // Actually, the brief says "tries same date again", so the employee re-requests a change for 2026-08-10
-    // (a new date pair). Let's create another valid scenario:
-    // Assume 2026-08-15 is currently DESCANSO, employee tries to request 2026-08-05 NOCHE to 2026-08-15 DIA
-    turnoAsignaciones.set('t-1|emp-1|2026-08-15', {
-      id: 'asig-3',
-      tenantId,
-      employeeId: 'emp-1',
-      fecha: new Date(2026, 7, 15),
-      tipoDia: 'DESCANSO',
-      turnoId: null,
-    });
-
-    // Actually, re-reading the brief: "Employee tries same date again → creates new PENDIENTE request"
-    // This implies the employee is trying to request a change for the SAME fechaNueva (2026-08-10)
-    // but with different parameters (different turno). However, validation checks that
-    // no-DESCANSO asignación exists on that date. Since we just set 2026-08-10 to TURNO (DIA),
-    // the second request SHOULD fail with conflict.
-    // Let's interpret "same date" as: employee tries 2026-08-05 (fechaActual) again, not 2026-08-10.
-
-    // Re-assign 2026-08-05 back to NOCHE for the retry scenario
-    turnoAsignaciones.set('t-1|emp-1|2026-08-05', {
+    // ===== STEP 6: Employee tries to request change for another date → creates new PENDIENTE =====
+    // Re-assign dateActual back to NOCHE for the retry scenario
+    turnoAsignaciones.set(`t-1|emp-1|${dateActual.toISOString().slice(0, 10)}`, {
       id: 'asig-1',
       tenantId,
       employeeId: 'emp-1',
-      fecha: new Date(2026, 7, 5),
+      fecha: dateActual,
       tipoDia: 'TURNO',
       turnoId: 'turno-noche',
     });
 
-    // Now employee requests another change: 2026-08-05 NOCHE → 2026-08-15 DESCANSO
+    // Setup third date as DESCANSO
+    turnoAsignaciones.set(`t-1|emp-1|${dateAlternate.toISOString().slice(0, 10)}`, {
+      id: 'asig-3',
+      tenantId,
+      employeeId: 'emp-1',
+      fecha: dateAlternate,
+      tipoDia: 'DESCANSO',
+      turnoId: null,
+    });
+
+    // Now employee requests another change: dateActual NOCHE → dateAlternate DESCANSO
     const solicitud2 = await solicitudService.crearSolicitud(tx, {
       tenantId,
       employeeId: 'emp-1',
-      fechaActual: new Date(2026, 7, 5),
+      fechaActual: dateActual,
       turnoIdActual: 'turno-noche',
-      fechaNueva: new Date(2026, 7, 15),
+      fechaNueva: dateAlternate,
       turnoIdNuevo: undefined, // Requesting DESCANSO
       creadoPor: 'emp-1',
     });
@@ -326,7 +323,7 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     expect(solicitud2.id).toBeDefined();
     expect(solicitud2.estado).toBe('PENDIENTE');
     expect(solicitud2.employeeId).toBe('emp-1');
-    expect(solicitud2.fechaNueva).toEqual(new Date(2026, 7, 15));
+    expect(solicitud2.fechaNueva).toEqual(dateAlternate);
 
     // ===== STEP 8: Manager rejects with motivo "Ya hay cobertura" =====
     const rechazada = await aplicadorService.rechazarSolicitud(
@@ -349,9 +346,9 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     const solicitud3 = await solicitudService.crearSolicitud(tx, {
       tenantId,
       employeeId: 'emp-1',
-      fechaActual: new Date(2026, 7, 5),
+      fechaActual: dateActual,
       turnoIdActual: 'turno-noche',
-      fechaNueva: new Date(2026, 7, 15),
+      fechaNueva: dateAlternate,
       turnoIdNuevo: undefined,
       creadoPor: 'emp-1',
     });
@@ -381,19 +378,18 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     expect(sol3Final.estado).toBe('PENDIENTE');
 
     // Verify the approvals actually updated the plan
-    // 2026-08-10 should still be DIA (from first approval)
-    const asig10Final = turnoAsignaciones.get('t-1|emp-1|2026-08-10');
-    expect(asig10Final.tipoDia).toBe('TURNO');
-    expect(asig10Final.turnoId).toBe('turno-dia');
+    const asigNuevaFinal = turnoAsignaciones.get(`t-1|emp-1|${dateNueva.toISOString().slice(0, 10)}`);
+    expect(asigNuevaFinal.tipoDia).toBe('TURNO');
+    expect(asigNuevaFinal.turnoId).toBe('turno-dia');
 
-    // 2026-08-15 should still be DESCANSO (never approved)
-    const asig15Final = turnoAsignaciones.get('t-1|emp-1|2026-08-15');
-    expect(asig15Final.tipoDia).toBe('DESCANSO');
+    // dateAlternate should still be DESCANSO (never approved)
+    const asigAltFinal = turnoAsignaciones.get(`t-1|emp-1|${dateAlternate.toISOString().slice(0, 10)}`);
+    expect(asigAltFinal.tipoDia).toBe('DESCANSO');
 
-    // 2026-08-05 should still be NOCHE (we didn't approve changing it)
-    const asig05Final = turnoAsignaciones.get('t-1|emp-1|2026-08-05');
-    expect(asig05Final.tipoDia).toBe('TURNO');
-    expect(asig05Final.turnoId).toBe('turno-noche');
+    // dateActual should still be NOCHE (we didn't approve changing it)
+    const asigActualFinal = turnoAsignaciones.get(`t-1|emp-1|${dateActual.toISOString().slice(0, 10)}`);
+    expect(asigActualFinal.tipoDia).toBe('TURNO');
+    expect(asigActualFinal.turnoId).toBe('turno-noche');
 
     // Verify notifications were called appropriately
     expect(mockNotificationService.notificarSolicitudAprobada).toHaveBeenCalledTimes(1);
@@ -408,11 +404,14 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     turnos.set('turno-noche', { id: 'turno-noche', tenantId, codigo: 'NOCHE', nombre: 'Noche', activo: true });
     turnos.set('turno-dia', { id: 'turno-dia', tenantId, codigo: 'DIA', nombre: 'Día', activo: true });
 
-    turnoAsignaciones.set('t-1|emp-1|2026-08-05', {
+    const dateActual = addDays(1);
+    const dateNueva = addDays(5);
+
+    turnoAsignaciones.set(`t-1|emp-1|${dateActual.toISOString().slice(0, 10)}`, {
       id: 'asig-1',
       tenantId,
       employeeId: 'emp-1',
-      fecha: new Date(2026, 7, 5),
+      fecha: dateActual,
       tipoDia: 'TURNO',
       turnoId: 'turno-noche',
     });
@@ -422,9 +421,9 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     const solicitud1 = await service.crearSolicitud(tx, {
       tenantId,
       employeeId: 'emp-1',
-      fechaActual: new Date(2026, 7, 5),
+      fechaActual: dateActual,
       turnoIdActual: 'turno-noche',
-      fechaNueva: new Date(2026, 7, 10),
+      fechaNueva: dateNueva,
       turnoIdNuevo: 'turno-dia',
       creadoPor: 'emp-1',
     });
@@ -436,9 +435,9 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       service.crearSolicitud(tx, {
         tenantId,
         employeeId: 'emp-1',
-        fechaActual: new Date(2026, 7, 5),
+        fechaActual: dateActual,
         turnoIdActual: 'turno-noche',
-        fechaNueva: new Date(2026, 7, 10),
+        fechaNueva: dateNueva,
         turnoIdNuevo: 'turno-dia',
         creadoPor: 'emp-1',
       }),
@@ -452,13 +451,16 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     employees.set('emp-1', { id: 'emp-1', tenantId, estado: 'activo' });
     turnos.set('turno-noche', { id: 'turno-noche', tenantId, codigo: 'NOCHE', nombre: 'Noche', activo: true });
 
+    const dateActual = addDays(1);
+    const dateNueva = addDays(5);
+
     // Manually insert an already-decided solicitud
     solicitudes.set('sol-decided', {
       id: 'sol-decided',
       tenantId,
       employeeId: 'emp-1',
-      fechaActual: new Date(2026, 7, 5),
-      fechaNueva: new Date(2026, 7, 10),
+      fechaActual: dateActual,
+      fechaNueva: dateNueva,
       turnoIdActual: 'turno-noche',
       turnoIdNuevo: null,
       estado: 'APROBADA',
@@ -480,13 +482,16 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     employees.set('emp-1', { id: 'emp-1', tenantId, estado: 'activo' });
     turnos.set('turno-noche', { id: 'turno-noche', tenantId, codigo: 'NOCHE', nombre: 'Noche', activo: true });
 
+    const dateActual = addDays(1);
+    const dateNueva = addDays(5);
+
     // Create a solicitud referencing a non-existent turno
     solicitudes.set('sol-bad-turno', {
       id: 'sol-bad-turno',
       tenantId,
       employeeId: 'emp-1',
-      fechaActual: new Date(2026, 7, 5),
-      fechaNueva: new Date(2026, 7, 10),
+      fechaActual: dateActual,
+      fechaNueva: dateNueva,
       turnoIdActual: 'turno-noche',
       turnoIdNuevo: 'turno-inexistente',
       estado: 'PENDIENTE',
@@ -507,11 +512,14 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     turnos.set('turno-dia', { id: 'turno-dia', tenantId, codigo: 'DIA', nombre: 'Día', activo: true });
     turnos.set('turno-noche', { id: 'turno-noche', tenantId, codigo: 'NOCHE', nombre: 'Noche', activo: true });
 
-    turnoAsignaciones.set('t-1|emp-1|2026-08-05', {
+    const dateActual = addDays(1);
+    const dateNueva = addDays(5);
+
+    turnoAsignaciones.set(`t-1|emp-1|${dateActual.toISOString().slice(0, 10)}`, {
       id: 'asig-1',
       tenantId,
       employeeId: 'emp-1',
-      fecha: new Date(2026, 7, 5),
+      fecha: dateActual,
       tipoDia: 'TURNO',
       turnoId: 'turno-noche',
     });
@@ -521,9 +529,9 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       data: {
         tenantId,
         employeeId: 'emp-1',
-        fechaActual: new Date(2026, 7, 5),
+        fechaActual: dateActual,
         turnoIdActual: 'turno-noche',
-        fechaNueva: new Date(2026, 7, 10),
+        fechaNueva: dateNueva,
         turnoIdNuevo: 'turno-dia',
         estado: 'PENDIENTE',
         creadoPor: 'emp-1',
@@ -548,7 +556,7 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     expect(mockNotificationService.notificarSolicitudAprobada).toHaveBeenCalled();
 
     // turnoAsignacion should be updated despite notification failure
-    const asig = turnoAsignaciones.get('t-1|emp-1|2026-08-10');
+    const asig = turnoAsignaciones.get(`t-1|emp-1|${dateNueva.toISOString().slice(0, 10)}`);
     expect(asig).toBeDefined();
     expect(asig.tipoDia).toBe('TURNO');
     expect(asig.turnoId).toBe('turno-dia');

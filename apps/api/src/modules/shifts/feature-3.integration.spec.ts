@@ -139,6 +139,14 @@ function buildAplicador(compensatorios: CompensatorioService) {
 }
 
 describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
+  // Helper to generate relative dates (independent of when test runs)
+  const addDays = (n: number): Date => {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() + n);
+    return date;
+  };
+
   it('Employee solicita, Manager aprueba/rechaza/reasigna, reportes se validan y generan compensatorios', async () => {
     const tenantId = 't-1';
     const { tx, solicitudes, employees, compensatorioMovimientos } = createFakeTx();
@@ -152,13 +160,20 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     const compensatorios = new CompensatorioService(mockEmployees);
     const { solicitudService, aplicadorService, mockNotificationService } = buildAplicador(compensatorios);
 
-    // ===== STEP 1: Employee A creates solicitud "Análisis urgente", 2026-08-05, 3h, URGENTE =====
+    // ===== STEP 1: Employee A creates solicitud "Análisis urgente", 3h, URGENTE =====
+    const date1 = addDays(1);
+    const date2 = addDays(2);
+    const date3 = addDays(3);
+    const date4 = addDays(4);
+    const date5 = addDays(7);
+    const date6 = addDays(8);
+
     const solicitud1 = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-a',
       employeeIdAsignado: 'emp-a',
       descripcionTarea: 'Análisis urgente',
-      fechaEstimada: new Date(2026, 7, 5),
+      fechaEstimada: date1,
       horasEstimadas: 3,
       urgencia: 'URGENTE',
       creadoPor: 'emp-a',
@@ -213,7 +228,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     expect(compensatorioMovimientos[0].tipo).toBe('GANADO');
     expect(compensatorioMovimientos[0].dias).toBe(0.38);
     expect(compensatorioMovimientos[0].employeeId).toBe('emp-a');
-    expect(compensatorioMovimientos[0].fechaReferencia).toEqual(new Date(2026, 7, 5));
+    expect(compensatorioMovimientos[0].fechaReferencia).toEqual(date1);
 
     // ===== STEP 9: Verify estado=VALIDADA, notifications fired =====
     expect(validada1.estado).toBe('VALIDADA');
@@ -231,7 +246,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
       employeeIdSolicitante: 'emp-b',
       employeeIdAsignado: 'emp-b',
       descripcionTarea: 'Reparación de equipo',
-      fechaEstimada: new Date(2026, 7, 6),
+      fechaEstimada: date2,
       horasEstimadas: 4,
       urgencia: 'NORMAL',
       creadoPor: 'emp-b',
@@ -295,7 +310,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
       employeeIdSolicitante: 'emp-c',
       employeeIdAsignado: 'emp-c',
       descripcionTarea: 'Inventario de bodega',
-      fechaEstimada: new Date(2026, 7, 7),
+      fechaEstimada: date3,
       horasEstimadas: 2,
       urgencia: 'NORMAL',
       creadoPor: 'emp-c',
@@ -319,7 +334,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
       tenantId,
       'emp-d',
       'Inventario de bodega',
-      new Date(2026, 7, 7),
+      date3,
       2,
     );
 
@@ -377,12 +392,14 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     const compensatorios = new CompensatorioService(mockEmployees);
     const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios, mockEmployees);
 
+    const date = addDays(4);
+
     const solicitud1 = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-x',
       employeeIdAsignado: 'emp-x',
       descripcionTarea: 'Tarea 1',
-      fechaEstimada: new Date(2026, 7, 8),
+      fechaEstimada: date,
       horasEstimadas: 2,
       urgencia: 'NORMAL',
       creadoPor: 'emp-x',
@@ -395,7 +412,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
         employeeIdSolicitante: 'emp-x',
         employeeIdAsignado: 'emp-x',
         descripcionTarea: 'Tarea 2 (duplicada)',
-        fechaEstimada: new Date(2026, 7, 8),
+        fechaEstimada: date,
         horasEstimadas: 1,
         urgencia: 'NORMAL',
         creadoPor: 'emp-x',
@@ -408,8 +425,8 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     const { tx, employees, asistenciaResumenes, compensatorioMovimientos } = createFakeTx();
     employees.set('emp-y', { id: 'emp-y', tenantId, estado: 'activo' });
 
-    // Semana del 2026-08-12 (miércoles): lunes 2026-08-10, domingo 2026-08-16
-    asistenciaResumenes.push({ employeeId: 'emp-y', fecha: new Date(2026, 7, 11), horasTrabajadas: 46 });
+    // Semana anterior: registro de asistencia
+    asistenciaResumenes.push({ employeeId: 'emp-y', fecha: addDays(7), horasTrabajadas: 46 });
 
     // Saldo compensatorio previo (AJUSTE_INICIAL simulado directamente en la tabla)
     compensatorioMovimientos.push({
@@ -429,7 +446,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
       employeeIdSolicitante: 'emp-y',
       employeeIdAsignado: 'emp-y',
       descripcionTarea: 'Soporte fin de semana',
-      fechaEstimada: new Date(2026, 7, 12),
+      fechaEstimada: addDays(8),
       horasEstimadas: 5,
       urgencia: 'URGENTE',
       creadoPor: 'emp-y',
