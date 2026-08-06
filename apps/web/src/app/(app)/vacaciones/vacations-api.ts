@@ -45,6 +45,7 @@ export async function actualizarPeriodo(
 
 export interface EmpleadoResumen {
   id: string;
+  userId: string;
   nombres: string;
   apellidos: string;
   numeroDocumento: string;

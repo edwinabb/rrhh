@@ -123,7 +123,7 @@ describe('Feature 1: Autogeneración de Patrones (E2E)', () => {
     });
 
     const patronService = new RotacionPatronService();
-    const shiftPlanService = new ShiftPlanService();
+    const shiftPlanService = new ShiftPlanService({} as any);
     const notificationService = { notificarPatronAplicado: jest.fn().mockResolvedValue(undefined) } as any;
     const aplicadorService = new RotacionAplicadorService(shiftPlanService, notificationService);
 

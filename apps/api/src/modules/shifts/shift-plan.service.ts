@@ -5,6 +5,8 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import type { TenantContext } from '../../common/database/tenant-request-context';
+import { EmployeesService } from '../employees/employees.service';
 
 const HORA_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 export type TipoDiaPlan = 'TURNO' | 'DESCANSO' | 'DESCANSO_COMPENSATORIO';
@@ -38,6 +40,8 @@ export interface UpsertAsignacionInput {
  */
 @Injectable()
 export class ShiftPlanService {
+  constructor(private readonly employees: EmployeesService) {}
+
   async listarTurnos(tx: any, incluirInactivos = false): Promise<any[]> {
     return tx.turno.findMany({
       where: incluirInactivos ? {} : { activo: true },
@@ -81,14 +85,32 @@ export class ShiftPlanService {
     return tx.turno.update({ where: { id }, data: cambios });
   }
 
-  async obtenerPlan(tx: any, desde: Date, hasta: Date, employeeId?: string): Promise<any[]> {
-    return tx.turnoAsignacion.findMany({
+  async obtenerPlan(ctx: TenantContext, desde: Date, hasta: Date, employeeId?: string): Promise<any[]> {
+    const tx = ctx.tx;
+    // `include: { employee: {...} }` haría un JOIN directo contra la tabla
+    // base "employee", que está REVOKE ALL para app_manager/app_employee (ver
+    // migración 20260710000000_init_foundations) — se resuelve aparte vía
+    // EmployeesService (vistas por rol) y se mergea en memoria.
+    const asignaciones = await tx.turnoAsignacion.findMany({
       where: { fecha: { gte: desde, lte: hasta }, ...(employeeId ? { employeeId } : {}) },
       include: {
         turno: { select: { codigo: true, nombre: true, horaInicio: true, horaFin: true } },
-        employee: { select: { nombres: true, apellidos: true, numeroDocumento: true } },
       },
       orderBy: [{ employeeId: 'asc' }, { fecha: 'asc' }],
+    });
+
+    const idsUnicos = [...new Set(asignaciones.map((a: any) => a.employeeId))] as string[];
+    const empleados = await this.employees.findByIds(ctx, idsUnicos);
+    const empleadosPorId = new Map(empleados.map((e) => [e.id, e]));
+
+    return asignaciones.map((a: any) => {
+      const emp = empleadosPorId.get(a.employeeId);
+      return {
+        ...a,
+        employee: emp
+          ? { nombres: emp.nombres, apellidos: emp.apellidos, numeroDocumento: emp.numeroDocumento as string | undefined }
+          : null,
+      };
     });
   }
 

@@ -112,8 +112,17 @@ function createFakeTx() {
   };
 }
 
+// EmployeesService mock: delega en tx.employee.findUnique (ver Group B/D del
+// review de fase 9).
+const mockEmployees: any = {
+  findById: jest.fn((ctx: any, id: string) => ctx.tx.employee.findUnique({ where: { id } })),
+};
+function ctxOf(tx: any) {
+  return { tx, pgRole: 'app_rrhh' as const } as any;
+}
+
 function buildAplicador(compensatorios: CompensatorioService) {
-  const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios);
+  const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios, mockEmployees);
   const mockNotificationService = {
     notificarTrabajoAprobado: jest.fn().mockResolvedValue(undefined),
     notificarTrabajoReasignado: jest.fn().mockResolvedValue(undefined),
@@ -140,11 +149,11 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     employees.set('emp-c', { id: 'emp-c', tenantId, estado: 'activo', nombre: 'Carla', email: 'carla@test.com' });
     employees.set('emp-d', { id: 'emp-d', tenantId, estado: 'activo', nombre: 'Diego', email: 'diego@test.com' });
 
-    const compensatorios = new CompensatorioService();
+    const compensatorios = new CompensatorioService(mockEmployees);
     const { solicitudService, aplicadorService, mockNotificationService } = buildAplicador(compensatorios);
 
     // ===== STEP 1: Employee A creates solicitud "Análisis urgente", 2026-08-05, 3h, URGENTE =====
-    const solicitud1 = await solicitudService.crearSolicitud(tx, {
+    const solicitud1 = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-a',
       employeeIdAsignado: 'emp-a',
@@ -217,7 +226,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     expect(await compensatorios.obtenerSaldo(tx, 'emp-a')).toBe(0.38);
 
     // ===== STEP 10: Manager rejects the report on ANOTHER solicitud (Employee B, different date) =====
-    const solicitud2 = await solicitudService.crearSolicitud(tx, {
+    const solicitud2 = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-b',
       employeeIdAsignado: 'emp-b',
@@ -281,7 +290,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     );
 
     // ===== STEP 13: Test reasignación (third solicitud): Manager reassigns Employee C -> Employee D =====
-    const solicitud3 = await solicitudService.crearSolicitud(tx, {
+    const solicitud3 = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-c',
       employeeIdAsignado: 'emp-c',
@@ -365,10 +374,10 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     const { tx, employees } = createFakeTx();
     employees.set('emp-x', { id: 'emp-x', tenantId, estado: 'activo' });
 
-    const compensatorios = new CompensatorioService();
-    const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios);
+    const compensatorios = new CompensatorioService(mockEmployees);
+    const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios, mockEmployees);
 
-    const solicitud1 = await solicitudService.crearSolicitud(tx, {
+    const solicitud1 = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-x',
       employeeIdAsignado: 'emp-x',
@@ -381,7 +390,7 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
     expect(solicitud1.estado).toBe('PENDIENTE_APROBACION');
 
     await expect(
-      solicitudService.crearSolicitud(tx, {
+      solicitudService.crearSolicitud(ctxOf(tx), {
         tenantId,
         employeeIdSolicitante: 'emp-x',
         employeeIdAsignado: 'emp-x',
@@ -412,10 +421,10 @@ describe('Feature 3: Trabajo Fuera de Turno (E2E)', () => {
       creadoEn: new Date(),
     });
 
-    const compensatorios = new CompensatorioService();
-    const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios);
+    const compensatorios = new CompensatorioService(mockEmployees);
+    const solicitudService = new SolicitudTrabajoAdicionalService(compensatorios, mockEmployees);
 
-    const solicitud = await solicitudService.crearSolicitud(tx, {
+    const solicitud = await solicitudService.crearSolicitud(ctxOf(tx), {
       tenantId,
       employeeIdSolicitante: 'emp-y',
       employeeIdAsignado: 'emp-y',

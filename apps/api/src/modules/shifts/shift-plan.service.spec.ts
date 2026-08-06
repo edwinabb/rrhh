@@ -24,7 +24,9 @@ function mockTx(overrides: any = {}) {
   };
 }
 
-const service = new ShiftPlanService();
+// obtenerPlan (resuelve empleados vía EmployeesService) no se ejercita en
+// este spec; los tests aquí solo cubren catálogo y upsertAsignacion.
+const service = new ShiftPlanService({} as any);
 
 describe('ShiftPlanService — catálogo', () => {
   it('crearTurno valida formato HH:mm y horas > 0', async () => {

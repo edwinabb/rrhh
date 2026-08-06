@@ -16,7 +16,10 @@ import { SolicitudCambioTurnoService } from './solicitud-cambio-turno.service';
 import { SolicitudCambioTurnoAplicadorService } from './solicitud-cambio-turno-aplicador.service';
 import { SolicitudTrabajoAdicionalService } from './solicitud-trabajo-adicional.service';
 import { SolicitudTrabajoAdicionalAplicadorService } from './solicitud-trabajo-adicional-aplicador.service';
+import { IntercambioTurnoService } from './intercambio-turno.service';
+import { IntercambioTurnoAplicadorService } from './intercambio-turno-aplicador.service';
 import { NotificationService } from '../../common/services/notification.service';
+import { EmployeesService } from '../employees/employees.service';
 
 const TIPOS_DIA: readonly TipoDiaPlan[] = ['TURNO', 'DESCANSO', 'DESCANSO_COMPENSATORIO'];
 const TIPOS_MOVIMIENTO: readonly TipoMovimientoCompensatorio[] = ['GANADO', 'AJUSTE_INICIAL'];
@@ -56,6 +59,9 @@ export class ShiftsController {
     private readonly solicitudTrabajoAdicional: SolicitudTrabajoAdicionalService,
     private readonly solicitudTrabajoAdicionalAplicador: SolicitudTrabajoAdicionalAplicadorService,
     private readonly notificacion: NotificationService,
+    private readonly intercambios: IntercambioTurnoService,
+    private readonly intercambiosAplicador: IntercambioTurnoAplicadorService,
+    private readonly employees: EmployeesService,
   ) {}
 
   private filtrarMotivoRechazoParaNoManagers(
@@ -134,7 +140,7 @@ export class ShiftsController {
     @Query('employeeId') employeeId?: string,
   ) {
     const ctx = getTenantContext();
-    return this.shiftPlan.obtenerPlan(ctx.tx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employeeId);
+    return this.shiftPlan.obtenerPlan(ctx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employeeId);
   }
 
   @Put('plan')
@@ -190,7 +196,7 @@ export class ShiftsController {
       employeeIdA: dto.employeeIdA,
       employeeIdB: dto.employeeIdB,
       creadoPor: userId,
-    });
+    }, ctx.pgRole);
   }
 
   @Post('compensatorios')
@@ -222,19 +228,161 @@ export class ShiftsController {
     return this.compensatorios.obtenerLibro(ctx.tx, employeeId);
   }
 
+  // --- Portal de intercambios autoservicio (fase 9) ---
+  @Post('intercambios/proponer')
+  @RequirePermission('shift.read')
+  async proponerIntercambio(@Req() request: Request, @Body() dto: any) {
+    if (!dto?.employeeIdB || !dto?.fecha) {
+      throw new BadRequestException('employeeIdB y fecha son obligatorios');
+    }
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleadoA = await this.employees.findByUserId(ctx, userId);
+    if (!empleadoA) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
+    const fecha = parseFecha(dto.fecha, 'fecha');
+    const intercambio = await this.intercambios.proponer(ctx, {
+      tenantId,
+      employeeIdA: empleadoA.id,
+      employeeIdB: dto.employeeIdB,
+      fecha,
+      mensajeA: dto.mensajeA,
+      creadoPor: userId,
+    });
+
+    try {
+      await this.notificacion.notificarIntercambioPropuesto(
+        tenantId, empleadoA.id, dto.employeeIdB, fecha, dto.mensajeA,
+      );
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return intercambio;
+  }
+
+  @Get('intercambios/mis-propuestas')
+  @RequirePermission('shift.read')
+  async listarMisPropuestasIntercambio(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await this.employees.findByUserId(ctx, userId);
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
+    return this.intercambios.listarMisPropuestas(ctx.tx, tenantId, empleado.id);
+  }
+
+  @Get('intercambios/propuestas-para-mi')
+  @RequirePermission('shift.read')
+  async listarPropuestasParaMiIntercambio(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await this.employees.findByUserId(ctx, userId);
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
+    return this.intercambios.listarPropuestasParaMi(ctx.tx, tenantId, empleado.id);
+  }
+
+  @Put('intercambios/:id/aceptar')
+  @RequirePermission('shift.read')
+  async aceptarIntercambio(@Req() request: Request, @Param('id') id: string) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await this.employees.findByUserId(ctx, userId);
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
+    const intercambio = await this.intercambios.aceptar(ctx.tx, tenantId, id, empleado.id);
+
+    try {
+      await this.notificacion.notificarIntercambioAceptadoPorB(
+        tenantId, intercambio.employeeIdA, intercambio.employeeIdB, intercambio.fecha,
+      );
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return intercambio;
+  }
+
+  @Put('intercambios/:id/rechazar')
+  @RequirePermission('shift.read')
+  async rechazarIntercambioPorB(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const empleado = await this.employees.findByUserId(ctx, userId);
+    if (!empleado) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
+    const intercambio = await this.intercambios.rechazarPorB(ctx.tx, tenantId, id, empleado.id, dto?.motivoRechazo);
+
+    try {
+      await this.notificacion.notificarIntercambioRechazadoPorB(tenantId, intercambio.employeeIdA, dto?.motivoRechazo);
+    } catch {
+      // No bloqueante: NotificationService ya loguea internamente sus errores.
+    }
+
+    return intercambio;
+  }
+
+  @Get('intercambios/pendientes')
+  @RequirePermission('shift.resolve')
+  async listarIntercambiosPendientes(@Req() request: Request) {
+    const ctx = getTenantContext();
+    const { tenantId } = requireIdentity(ctx);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
+    return ctx.tx.intercambioTurno.findMany({
+      where: { tenantId, estado: 'ACEPTADA_POR_B' },
+      orderBy: { aceptadoEn: 'asc' },
+    });
+  }
+
+  @Put('intercambios/:id/aprobar')
+  @RequirePermission('shift.resolve')
+  async aprobarIntercambio(@Req() request: Request, @Param('id') id: string) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await this.employees.findByUserId(ctx, userId);
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    return this.intercambiosAplicador.aprobar(ctx.tx, tenantId, ctx.pgRole, id, manager.id);
+  }
+
+  @Put('intercambios/:id/rechazar-manager')
+  @RequirePermission('shift.resolve')
+  async rechazarIntercambioManager(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
+    const ctx = getTenantContext();
+    const { tenantId, userId } = requireIdentity(ctx);
+    const manager = await this.employees.findByUserId(ctx, userId);
+    if (!manager) {
+      throw new BadRequestException('La sesión no tiene un empleado asociado');
+    }
+    return this.intercambiosAplicador.rechazarManager(ctx.tx, tenantId, ctx.pgRole, id, manager.id, dto?.motivoRechazo);
+  }
+
   // --- Cumplimiento ---
   @Get('cumplimiento/:periodo')
   @RequirePermission('shift.read')
   async cumplimiento(@Param('periodo') periodo: string) {
     const ctx = getTenantContext();
-    return this.compliance.generarReporte(ctx.tx, periodo);
+    return this.compliance.generarReporte(ctx, periodo);
   }
 
   @Get('cumplimiento/:periodo/export')
   @RequirePermission('shift.manage')
   async exportNovedades(@Param('periodo') periodo: string) {
     const ctx = getTenantContext();
-    return { csv: await this.compliance.exportarNovedadesCsv(ctx.tx, periodo) };
+    return { csv: await this.compliance.exportarNovedadesCsv(ctx, periodo) };
   }
 
   // --- Autoservicio: el empleado ve su propio plan ---
@@ -242,12 +390,12 @@ export class ShiftsController {
   async miPlan(@Query('desde') desde: string, @Query('hasta') hasta: string) {
     const ctx = getTenantContext();
     const { userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
     return this.shiftPlan.obtenerPlan(
-      ctx.tx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employee.id,
+      ctx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employee.id,
     );
   }
 
@@ -260,7 +408,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -296,7 +444,7 @@ export class ShiftsController {
     if (fechaDesde) filtros.fechaDesde = parseFecha(fechaDesde, 'fechaDesde');
     if (fechaHasta) filtros.fechaHasta = parseFecha(fechaHasta, 'fechaHasta');
 
-    const solicitudes = await this.solicitudCambioTurno.listarSolicitudes(ctx.tx, filtros);
+    const solicitudes = await this.solicitudCambioTurno.listarSolicitudes(ctx, filtros);
     return this.filtrarMotivoRechazoParaNoManagers(solicitudes, request);
   }
 
@@ -305,13 +453,13 @@ export class ShiftsController {
   async listarMisSolicitudesCambio(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
 
     const solicitudes = await this.solicitudCambioTurno.listarMisSolicitudes(
-      ctx.tx,
+      ctx,
       tenantId,
       employee.id,
     );
@@ -418,13 +566,13 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
 
     const fechaEstimada = parseFecha(dto.fechaEstimada, 'fechaEstimada');
-    const solicitud = await this.solicitudTrabajoAdicional.crearSolicitud(ctx.tx, {
+    const solicitud = await this.solicitudTrabajoAdicional.crearSolicitud(ctx, {
       tenantId,
       employeeIdSolicitante: employee.id,
       employeeIdAsignado: employee.id,
@@ -456,7 +604,7 @@ export class ShiftsController {
   async listarMisSolicitudesTrabajoAdicional(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -514,7 +662,7 @@ export class ShiftsController {
   async aprobarTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -535,7 +683,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -554,7 +702,7 @@ export class ShiftsController {
   async rechazarTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -581,7 +729,7 @@ export class ShiftsController {
     const tienePermisoManage = permissions.includes('shift.manage');
     if (!tienePermisoManage) {
       const { userId } = requireIdentity(ctx);
-      const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+      const employee = await this.employees.findByUserId(ctx, userId);
       const esParticipante =
         !!employee &&
         (solicitud.employeeIdSolicitante === employee.id || solicitud.employeeIdAsignado === employee.id);
@@ -601,7 +749,7 @@ export class ShiftsController {
     }
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const employee = await ctx.tx.employee.findFirst({ where: { userId } });
+    const employee = await this.employees.findByUserId(ctx, userId);
     if (!employee) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -636,7 +784,7 @@ export class ShiftsController {
   async validarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
@@ -654,7 +802,7 @@ export class ShiftsController {
   async rechazarReporteTrabajoAdicional(@Req() request: Request, @Param('id') id: string, @Body() dto: any) {
     const ctx = getTenantContext();
     const { tenantId, userId } = requireIdentity(ctx);
-    const manager = await ctx.tx.employee.findFirst({ where: { userId } });
+    const manager = await this.employees.findByUserId(ctx, userId);
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }

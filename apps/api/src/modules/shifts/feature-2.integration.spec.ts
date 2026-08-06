@@ -216,8 +216,8 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       turnoId: null,
     });
 
-    const solicitudService = new SolicitudCambioTurnoService();
-    const shiftPlanService = new ShiftPlanService();
+    const solicitudService = new SolicitudCambioTurnoService({} as any);
+    const shiftPlanService = new ShiftPlanService({} as any);
     const mockNotificationService = {
       notificarSolicitudAprobada: jest.fn().mockResolvedValue(undefined),
       notificarSolicitudRechazada: jest.fn().mockResolvedValue(undefined),
@@ -417,7 +417,7 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       turnoId: 'turno-noche',
     });
 
-    const service = new SolicitudCambioTurnoService();
+    const service = new SolicitudCambioTurnoService({} as any);
 
     const solicitud1 = await service.crearSolicitud(tx, {
       tenantId,
@@ -466,7 +466,7 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       fechaDecision: new Date(),
     });
 
-    const service = new SolicitudCambioTurnoService();
+    const service = new SolicitudCambioTurnoService({} as any);
 
     await expect(
       service.actualizarEstado(tx, 'sol-decided', 'RECHAZADA', 'mgr-2', 'Cambié de opinión'),
@@ -492,7 +492,7 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
       estado: 'PENDIENTE',
     });
 
-    const service = new SolicitudCambioTurnoService();
+    const service = new SolicitudCambioTurnoService({} as any);
 
     await expect(service.actualizarEstado(tx, 'sol-bad-turno', 'APROBADA', 'mgr-1')).rejects.toThrow(
       'El turno nuevo indicado no existe',
@@ -536,8 +536,8 @@ describe('Feature 2: Cambios de Turno (E2E)', () => {
     };
 
     const aplicador = new SolicitudCambioTurnoAplicadorService(
-      new SolicitudCambioTurnoService(),
-      new ShiftPlanService(),
+      new SolicitudCambioTurnoService({} as any),
+      new ShiftPlanService({} as any),
       mockNotificationService as any,
     );
 

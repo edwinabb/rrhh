@@ -28,8 +28,17 @@ const TENANT = 't-1';
 const SOLICITANTE = 'emp-1';
 const ASIGNADO = 'emp-2';
 
+// EmployeesService mock: delega en tx.employee.findUnique (ver Group B/D del
+// review de fase 9).
+const mockEmployees: any = {
+  findById: jest.fn((ctx: any, id: string) => ctx.tx.employee.findUnique({ where: { id } })),
+};
+function ctxOf(tx: any) {
+  return { tx, pgRole: 'app_rrhh' as const } as any;
+}
+
 function crearServicio() {
-  return new SolicitudTrabajoAdicionalService(new CompensatorioService());
+  return new SolicitudTrabajoAdicionalService(new CompensatorioService(mockEmployees), mockEmployees);
 }
 
 function inputBase(overrides: any = {}) {
@@ -52,7 +61,7 @@ describe('SolicitudTrabajoAdicionalService', () => {
       const tx = mockTx();
       const service = crearServicio();
 
-      const resultado = await service.crearSolicitud(tx, inputBase());
+      const resultado = await service.crearSolicitud(ctxOf(tx), inputBase());
 
       expect(resultado.estado).toBe('PENDIENTE_APROBACION');
       expect(resultado.horasAcumuladas).toBe(4); // 0 acumuladas + 4 estimadas
@@ -69,7 +78,7 @@ describe('SolicitudTrabajoAdicionalService', () => {
       });
       const service = crearServicio();
 
-      const resultado = await service.crearSolicitud(tx, inputBase({ horasEstimadas: 6 }));
+      const resultado = await service.crearSolicitud(ctxOf(tx), inputBase({ horasEstimadas: 6 }));
 
       expect(resultado.horasAcumuladas).toBe(50);
       expect(resultado.causaHorasExtras).toBe(true);
@@ -80,7 +89,7 @@ describe('SolicitudTrabajoAdicionalService', () => {
       const service = crearServicio();
 
       await expect(
-        service.crearSolicitud(tx, inputBase({ fechaEstimada: new Date(2020, 0, 1) })),
+        service.crearSolicitud(ctxOf(tx), inputBase({ fechaEstimada: new Date(2020, 0, 1) })),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -89,7 +98,7 @@ describe('SolicitudTrabajoAdicionalService', () => {
       const service = crearServicio();
 
       await expect(
-        service.crearSolicitud(tx, inputBase({ horasEstimadas: 13 })),
+        service.crearSolicitud(ctxOf(tx), inputBase({ horasEstimadas: 13 })),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -98,7 +107,7 @@ describe('SolicitudTrabajoAdicionalService', () => {
       const service = crearServicio();
 
       await expect(
-        service.crearSolicitud(tx, inputBase({ horasEstimadas: 0 })),
+        service.crearSolicitud(ctxOf(tx), inputBase({ horasEstimadas: 0 })),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -106,14 +115,14 @@ describe('SolicitudTrabajoAdicionalService', () => {
       const tx = mockTx({ employee: { findUnique: jest.fn().mockResolvedValue(null) } });
       const service = crearServicio();
 
-      await expect(service.crearSolicitud(tx, inputBase())).rejects.toThrow(NotFoundException);
+      await expect(service.crearSolicitud(ctxOf(tx), inputBase())).rejects.toThrow(NotFoundException);
     });
 
     it('rechaza si el empleado solicitante no está activo', async () => {
       const tx = mockTx({ employee: { findUnique: jest.fn().mockResolvedValue({ id: SOLICITANTE, estado: 'cesado' }) } });
       const service = crearServicio();
 
-      await expect(service.crearSolicitud(tx, inputBase())).rejects.toThrow(BadRequestException);
+      await expect(service.crearSolicitud(ctxOf(tx), inputBase())).rejects.toThrow(BadRequestException);
     });
 
     it('rechaza solicitud duplicada para el mismo empleado y fecha en estado no terminal', async () => {
@@ -121,7 +130,7 @@ describe('SolicitudTrabajoAdicionalService', () => {
       tx.solicitudTrabajoAdicional.findFirst.mockResolvedValue({ id: 'sol-existente', estado: 'APROBADA' });
       const service = crearServicio();
 
-      await expect(service.crearSolicitud(tx, inputBase())).rejects.toThrow(ConflictException);
+      await expect(service.crearSolicitud(ctxOf(tx), inputBase())).rejects.toThrow(ConflictException);
     });
   });
 

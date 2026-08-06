@@ -11,6 +11,8 @@ import { MisCambiosTab } from './mis-cambios-tab';
 import { CambiosBoardTab } from './cambios-board-tab';
 import { TrabajoAdicionalEmpleadoTab } from './trabajo-adicional-empleado-tab';
 import { TrabajoAdicionalManagerTab } from './trabajo-adicional-manager-tab';
+import { IntercambiosEmpleadoTab } from './intercambios-empleado-tab';
+import { IntercambiosManagerTab } from './intercambios-manager-tab';
 
 const TABS = [
   { id: 'plan', label: 'Plan' },
@@ -23,6 +25,8 @@ const TABS = [
   { id: 'cambios-board', label: 'Cambios (Manager)' },
   { id: 'trabajo-adicional-empleado', label: 'Trabajo Adicional' },
   { id: 'trabajo-adicional-manager', label: 'Trabajo Adicional (Manager)' },
+  { id: 'intercambios-empleado', label: 'Intercambios' },
+  { id: 'intercambios-manager', label: 'Intercambios (Manager)' },
 ] as const;
 
 export default function TurnosPage() {
@@ -52,6 +56,8 @@ export default function TurnosPage() {
       {tab === 'cambios-board' && <CambiosBoardTab />}
       {tab === 'trabajo-adicional-empleado' && <TrabajoAdicionalEmpleadoTab />}
       {tab === 'trabajo-adicional-manager' && <TrabajoAdicionalManagerTab />}
+      {tab === 'intercambios-empleado' && <IntercambiosEmpleadoTab />}
+      {tab === 'intercambios-manager' && <IntercambiosManagerTab />}
     </div>
   );
 }

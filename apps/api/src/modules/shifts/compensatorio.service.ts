@@ -3,6 +3,8 @@ import {
   Injectable,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import type { TenantContext } from '../../common/database/tenant-request-context';
+import { EmployeesService } from '../employees/employees.service';
 
 export type TipoMovimientoCompensatorio = 'GANADO' | 'GOZADO' | 'AJUSTE_INICIAL';
 
@@ -31,6 +33,8 @@ export interface IntercambioInput {
  */
 @Injectable()
 export class CompensatorioService {
+  constructor(private readonly employees: EmployeesService) {}
+
   async obtenerSaldo(tx: any, employeeId: string): Promise<number> {
     const agregado = await tx.compensatorioMovimiento.aggregate({
       where: { employeeId },
@@ -70,7 +74,10 @@ export class CompensatorioService {
     });
   }
 
-  async intercambiar(tx: any, input: IntercambioInput): Promise<{ a: any; b: any }> {
+  async intercambiar(
+    tx: any, input: IntercambioInput, pgRole: TenantContext['pgRole'],
+  ): Promise<{ a: any; b: any }> {
+    const ctx = { tx, pgRole } as TenantContext;
     const [asigA, asigB] = await Promise.all([
       tx.turnoAsignacion.findUnique({
         where: {
@@ -95,8 +102,8 @@ export class CompensatorioService {
     }
 
     const [empA, empB] = await Promise.all([
-      tx.employee.findUnique({ where: { id: input.employeeIdA } }),
-      tx.employee.findUnique({ where: { id: input.employeeIdB } }),
+      this.employees.findById(ctx, input.employeeIdA),
+      this.employees.findById(ctx, input.employeeIdB),
     ]);
 
     const a = await tx.turnoAsignacion.update({

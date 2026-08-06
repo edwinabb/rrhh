@@ -935,4 +935,103 @@ describe('NotificationService', () => {
     ).resolves.toBeUndefined();
     expect(Logger.prototype.error).toHaveBeenCalled();
   });
+
+  // ========== Tests para el Portal de Intercambios (fase 9) ==========
+  it('notificarIntercambioPropuesto: envía email a B con el mensaje de A', async () => {
+    const prisma = mockPrisma({
+      employee: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'emp-b', user: { email: 'b@test.com' } }),
+      },
+    });
+    const service = new NotificationService(prisma as any);
+    const enviarEmailSpy = jest.spyOn(service as any, 'enviarEmail');
+
+    await service.notificarIntercambioPropuesto('t-1', 'emp-a', 'emp-b', new Date(2026, 8, 10), 'Tengo cita');
+
+    expect(enviarEmailSpy).toHaveBeenCalledWith(
+      'b@test.com',
+      expect.any(String),
+      expect.stringContaining('Tengo cita'),
+    );
+  });
+
+  it('notificarIntercambioPropuesto: no lanza si B no tiene usuario/email', async () => {
+    const prisma = mockPrisma({ employee: { findUnique: jest.fn().mockResolvedValue(null) } });
+    const service = new NotificationService(prisma as any);
+    await expect(
+      service.notificarIntercambioPropuesto('t-1', 'emp-a', 'emp-b', new Date(2026, 8, 10)),
+    ).resolves.toBeUndefined();
+  });
+
+  it('notificarIntercambioRechazadoPorB: envía email a A', async () => {
+    const prisma = mockPrisma({
+      employee: { findUnique: jest.fn().mockResolvedValue({ id: 'emp-a', user: { email: 'a@test.com' } }) },
+    });
+    const service = new NotificationService(prisma as any);
+    const enviarEmailSpy = jest.spyOn(service as any, 'enviarEmail');
+
+    await service.notificarIntercambioRechazadoPorB('t-1', 'emp-a', 'No puedo ese día');
+
+    expect(enviarEmailSpy).toHaveBeenCalledWith('a@test.com', expect.any(String), expect.any(String));
+  });
+
+  it('notificarIntercambioAceptadoPorB: envía email al manager de A vía managerId', async () => {
+    const prisma = mockPrisma({
+      employee: {
+        findUnique: jest.fn().mockImplementation(({ where }: any) => {
+          if (where.id === 'emp-a') {
+            return Promise.resolve({ managerId: 'mgr-1', nombres: 'Ana', apellidos: 'Ruiz' });
+          } else if (where.id === 'emp-b') {
+            return Promise.resolve({ nombres: 'Beto', apellidos: 'Soto' });
+          } else {
+            return Promise.resolve({ user: { email: 'mgr@test.com' } });
+          }
+        }),
+      },
+    });
+    const service = new NotificationService(prisma as any);
+    const enviarEmailSpy = jest.spyOn(service as any, 'enviarEmail');
+
+    await service.notificarIntercambioAceptadoPorB('t-1', 'emp-a', 'emp-b', new Date(2026, 8, 10));
+
+    expect(enviarEmailSpy).toHaveBeenCalledWith('mgr@test.com', expect.any(String), expect.any(String));
+    const callArgs = enviarEmailSpy.mock.calls[0];
+    expect(callArgs?.[2]).toContain('Beto Soto');
+  });
+
+  it('notificarIntercambioAceptadoPorB: no lanza si A no tiene manager asignado', async () => {
+    const prisma = mockPrisma({
+      employee: { findUnique: jest.fn().mockResolvedValue({ managerId: null }) },
+    });
+    const service = new NotificationService(prisma as any);
+    await expect(
+      service.notificarIntercambioAceptadoPorB('t-1', 'emp-a', 'emp-b', new Date(2026, 8, 10)),
+    ).resolves.toBeUndefined();
+  });
+
+  it('notificarIntercambioAprobado: aclara que fue automático cuando fueAutomatico=true', async () => {
+    const prisma = mockPrisma({
+      employee: { findUnique: jest.fn().mockResolvedValue({ user: { email: 'x@test.com' } }) },
+    });
+    const service = new NotificationService(prisma as any);
+    const enviarEmailSpy = jest.spyOn(service as any, 'enviarEmail');
+
+    await service.notificarIntercambioAprobado('t-1', 'emp-a', 'emp-b', new Date(2026, 8, 10), true);
+
+    expect(enviarEmailSpy).toHaveBeenCalledTimes(2); // A y B
+    const callArgs = enviarEmailSpy.mock.calls[0];
+    expect(callArgs?.[2]).toContain('automáticamente');
+  });
+
+  it('notificarIntercambioRechazado: notifica a ambos empleados', async () => {
+    const prisma = mockPrisma({
+      employee: { findUnique: jest.fn().mockResolvedValue({ user: { email: 'x@test.com' } }) },
+    });
+    const service = new NotificationService(prisma as any);
+    const enviarEmailSpy = jest.spyOn(service as any, 'enviarEmail');
+
+    await service.notificarIntercambioRechazado('t-1', 'emp-a', 'emp-b', 'El turno cambió');
+
+    expect(enviarEmailSpy).toHaveBeenCalledTimes(2);
+  });
 });

@@ -14,11 +14,19 @@ function mockTx(overrides: any = {}) {
   };
 }
 
-const service = new ShiftComplianceService();
+// EmployeesService mock: delega en tx.employee.findMany (ver Group B/D del
+// review de fase 9).
+const mockEmployees: any = {
+  list: jest.fn((ctx: any) => ctx.tx.employee.findMany({})),
+};
+function ctxOf(tx: any) {
+  return { tx, pgRole: 'app_rrhh' as const, tenantId: 't-1' } as any;
+}
+const service = new ShiftComplianceService(mockEmployees);
 
 describe('ShiftComplianceService', () => {
   it('periodo inválido → 400', async () => {
-    await expect(service.generarReporte(mockTx(), '2026-13')).rejects.toThrow(BadRequestException);
+    await expect(service.generarReporte(ctxOf(mockTx()), '2026-13')).rejects.toThrow(BadRequestException);
   });
 
   it('agrega por empleado: planificados, trabajados, tardanzas, déficit', async () => {
@@ -32,7 +40,7 @@ describe('ShiftComplianceService', () => {
       { employeeId: 'emp-1', fecha: new Date(2026, 7, 3), horasTrabajadas: 12, tardanzaMinutos: 35, deficitMinutos: 0, falta: false, justificado: false, sinPlan: false },
       { employeeId: 'emp-1', fecha: new Date(2026, 7, 4), horasTrabajadas: 11.5, tardanzaMinutos: 0, deficitMinutos: 30, falta: false, justificado: false, sinPlan: false },
     ]);
-    const r = await service.generarReporte(tx, '2026-08');
+    const r = await service.generarReporte(ctxOf(tx), '2026-08');
     const emp = r.empleados[0]!;
     expect(emp.diasPlanificados).toBe(2);
     expect(emp.diasTrabajados).toBe(2);
@@ -53,7 +61,7 @@ describe('ShiftComplianceService', () => {
     tx.asistenciaResumen.findMany.mockResolvedValue([
       { employeeId: 'emp-1', fecha: new Date(2026, 6, 3), horasTrabajadas: 12, tardanzaMinutos: 0, deficitMinutos: 0, falta: false, justificado: false, sinPlan: true },
     ]);
-    const r = await service.generarReporte(tx, '2026-07');
+    const r = await service.generarReporte(ctxOf(tx), '2026-07');
     const empA = r.empleados.find((e: any) => e.employeeId === 'emp-1')!;
     const empB = r.empleados.find((e: any) => e.employeeId === 'emp-2')!;
     expect(empB.faltas).toBe(1);
@@ -71,7 +79,7 @@ describe('ShiftComplianceService', () => {
       { employeeId: 'emp-1', tipo: 'GANADO', dias: 1, creadoEn: new Date(2026, 7, 10) },
       { employeeId: 'emp-1', tipo: 'GOZADO', dias: -1, creadoEn: new Date(2026, 7, 15) },
     ]);
-    const r = await service.generarReporte(tx, '2026-08');
+    const r = await service.generarReporte(ctxOf(tx), '2026-08');
     expect(r.empleados[0]!.compensatorios).toEqual({
       saldoInicial: 2, ganados: 1, gozados: -1, saldoActual: 2,
     });
@@ -92,12 +100,12 @@ describe('ShiftComplianceService', () => {
         tardanzaMinutos: 0, deficitMinutos: 0, falta: false, justificado: false, sinPlan: false,
       })),
     );
-    const r = await service.generarReporte(tx, '2026-08');
+    const r = await service.generarReporte(ctxOf(tx), '2026-08');
     expect(r.empleados[0]!.alertasConfianza).toHaveLength(1);
     expect(r.empleados[0]!.alertasConfianza[0]!).toContain('52');
     // Sin flag de confianza no hay alertas
     tx.contrato.findMany.mockResolvedValue([]);
-    const r2 = await service.generarReporte(tx, '2026-08');
+    const r2 = await service.generarReporte(ctxOf(tx), '2026-08');
     expect(r2.empleados[0]!.alertasConfianza).toHaveLength(0);
   });
 
@@ -109,7 +117,7 @@ describe('ShiftComplianceService', () => {
     tx.asistenciaResumen.findMany.mockResolvedValue([
       { employeeId: 'emp-1', fecha: new Date(2026, 7, 3), horasTrabajadas: 12, tardanzaMinutos: 0, deficitMinutos: 0, falta: false, justificado: false, sinPlan: false },
     ]);
-    const csv = await service.exportarNovedadesCsv(tx, '2026-08');
+    const csv = await service.exportarNovedadesCsv(ctxOf(tx), '2026-08');
     expect(csv).toContain('numero_documento,dias_laborados,horas_extra_25,horas_extra_35,bonificaciones,descuentos');
     expect(csv).toContain('45678901,1,,,,');
   });

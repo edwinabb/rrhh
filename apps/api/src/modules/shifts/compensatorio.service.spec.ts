@@ -18,7 +18,12 @@ function mockTx(overrides: any = {}) {
   };
 }
 
-const service = new CompensatorioService();
+// EmployeesService mock: delega en tx.employee.findUnique (ver Group B/D del
+// review de fase 9).
+const mockEmployees: any = {
+  findById: jest.fn((ctx: any, id: string) => ctx.tx.employee.findUnique({ where: { id } })),
+};
+const service = new CompensatorioService(mockEmployees);
 
 describe('CompensatorioService — movimientos y saldo', () => {
   it('obtenerSaldo suma los días del libro', async () => {
@@ -53,7 +58,7 @@ describe('CompensatorioService — intercambio', () => {
     await service.intercambiar(tx, {
       tenantId: 't-1', fecha: new Date(2026, 7, 10),
       employeeIdA: 'emp-a', employeeIdB: 'emp-b', creadoPor: 'u-1',
-    });
+    }, 'app_rrhh');
     expect(tx.turnoAsignacion.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'asig-a' }, data: expect.objectContaining({ tipoDia: 'TURNO', turnoId: 'turno-noche' }) }),
     );
@@ -70,7 +75,7 @@ describe('CompensatorioService — intercambio', () => {
       service.intercambiar(tx, {
         tenantId: 't-1', fecha: new Date(2026, 7, 10),
         employeeIdA: 'emp-a', employeeIdB: 'emp-b', creadoPor: 'u-1',
-      }),
+      }, 'app_rrhh'),
     ).rejects.toThrow(UnprocessableEntityException);
   });
 });

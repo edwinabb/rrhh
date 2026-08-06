@@ -1,6 +1,8 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CompensatorioService } from './compensatorio.service';
 import { NormativeParameterService } from '../normative-params/normative-parameter.service';
+import type { TenantContext } from '../../common/database/tenant-request-context';
+import { EmployeesService } from '../employees/employees.service';
 
 export type UrgenciaTrabajoAdicional = 'NORMAL' | 'URGENTE';
 export type EstadoSolicitudTrabajoAdicional =
@@ -86,10 +88,12 @@ function domingoDe(fecha: Date): Date {
 export class SolicitudTrabajoAdicionalService {
   constructor(
     private readonly compensatorios: CompensatorioService,
+    private readonly employees: EmployeesService,
     private readonly normativeParams?: NormativeParameterService,
   ) {}
 
-  async crearSolicitud(tx: any, input: CrearSolicitudInput): Promise<any> {
+  async crearSolicitud(ctx: TenantContext, input: CrearSolicitudInput): Promise<any> {
+    const tx = ctx.tx;
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
@@ -101,7 +105,7 @@ export class SolicitudTrabajoAdicionalService {
       throw new BadRequestException('horasEstimadas debe ser mayor a 0 y menor o igual a 12');
     }
 
-    const empleado = await tx.employee.findUnique({ where: { id: input.employeeIdSolicitante } });
+    const empleado = await this.employees.findById(ctx, input.employeeIdSolicitante);
     if (!empleado) {
       throw new NotFoundException(`Empleado ${input.employeeIdSolicitante} no encontrado`);
     }
@@ -114,7 +118,7 @@ export class SolicitudTrabajoAdicionalService {
         tenantId: input.tenantId,
         employeeIdSolicitante: input.employeeIdSolicitante,
         fechaEstimada: input.fechaEstimada,
-        estado: { in: ESTADOS_NO_TERMINALES_DUPLICADO },
+        estado: { in: [...ESTADOS_NO_TERMINALES_DUPLICADO] },
       },
     });
     if (duplicado) {
