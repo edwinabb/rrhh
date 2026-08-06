@@ -4,11 +4,18 @@ import { PayrollRunService } from './payroll-run.service';
 import { PayrollImportService } from './payroll-import.service';
 import { PlanillaExporter } from './planilla-exporter.service';
 import { BankFileExporter } from './bank-file-exporter.service';
+import { PayrollExportMapperService } from './payroll-export-mapper.service';
 import { NormativeParamsModule } from '../normative-params/normative-params.module';
 
 @Module({
   imports: [NormativeParamsModule],
   controllers: [PayrollController],
-  providers: [PayrollRunService, PayrollImportService, PlanillaExporter, BankFileExporter],
+  providers: [
+    PayrollRunService,
+    PayrollImportService,
+    PlanillaExporter,
+    BankFileExporter,
+    PayrollExportMapperService,
+  ],
 })
 export class PayrollModule {}
