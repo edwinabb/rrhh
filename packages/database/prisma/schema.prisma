@@ -49,6 +49,9 @@ model Tenant {
   // Fase 9 — Portal de intercambios
   intercambiosTurno IntercambioTurno[]
 
+  // Exportación de nómina: configuración por tenant
+  payrollExportConfig TenantPayrollExportConfig?
+
   // Fase 2 — Asistencia
   marcaciones             Marcacion[]
   geofences               Geofence[]
@@ -331,6 +334,23 @@ model Provision {
 
   @@index([tenantId, periodo])
   @@map("provision")
+}
+
+// Configuración de exportación de nómina por tenant: monto (devengado/pagado),
+// formato (pipe/json), conceptos excluidos y campos sensibles a ofuscar.
+model TenantPayrollExportConfig {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String   @unique @map("tenant_id") @db.Uuid
+  montoMode          String   @map("monto_mode") @default("devengado_igual_pagado")
+  formatoExportar    String   @map("formato_exportar") @default("pipe")
+  conceptosExcluidos Json     @map("conceptos_excluidos") @default("[]")
+  camposSensibles    Json     @map("campos_sensibles") @default("[]")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_payroll_export_config")
 }
 
 /// Novedades del período (importadas por CSV u otra fuente) que el motor de
