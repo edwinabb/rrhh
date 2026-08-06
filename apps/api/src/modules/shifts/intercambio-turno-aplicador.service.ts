@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException, ConflictExc
 import { CompensatorioService } from './compensatorio.service';
 import { NotificationService } from '../../common/services/notification.service';
 import type { MotivoResolucionIntercambio } from './intercambio-turno.service';
+import type { TenantContext } from '../../common/database/tenant-request-context';
 
 const HORAS_PLAZO_MANAGER = 48;
 
@@ -21,7 +22,7 @@ export class IntercambioTurnoAplicadorService {
     private readonly notificationService: NotificationService,
   ) {}
 
-  async barrido(tx: any, tenantId: string): Promise<void> {
+  async barrido(tx: any, tenantId: string, pgRole: TenantContext['pgRole']): Promise<void> {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
@@ -56,7 +57,7 @@ export class IntercambioTurnoAplicadorService {
             decididoPor: null,
             estadoAprobado: 'AUTO_APROBADA',
             motivoResolucion: porFecha ? 'FECHA_ALCANZADA' : 'PLAZO_48H',
-          });
+          }, pgRole);
         } catch (err) {
           // Mismo criterio: aislar el fallo de un registro para no tumbar
           // el barrido ni el request del endpoint que lo disparó.
@@ -68,10 +69,14 @@ export class IntercambioTurnoAplicadorService {
     }
   }
 
-  async aprobar(tx: any, tenantId: string, id: string, managerId: string): Promise<any> {
-    await this.barrido(tx, tenantId);
+  async aprobar(
+    tx: any, tenantId: string, pgRole: TenantContext['pgRole'], id: string, managerId: string,
+  ): Promise<any> {
+    await this.barrido(tx, tenantId, pgRole);
     const it = await this.obtenerAceptadaPorB(tx, tenantId, id);
-    const resultado = await this.ejecutarSwap(tx, it, { decididoPor: managerId, estadoAprobado: 'APROBADA_MANAGER' });
+    const resultado = await this.ejecutarSwap(
+      tx, it, { decididoPor: managerId, estadoAprobado: 'APROBADA_MANAGER' }, pgRole,
+    );
     if (resultado === null) {
       throw new ConflictException(
         `El intercambio ${id} ya fue resuelto por otro proceso mientras se procesaba tu decisión`,
@@ -83,11 +88,12 @@ export class IntercambioTurnoAplicadorService {
   async rechazarManager(
     tx: any,
     tenantId: string,
+    pgRole: TenantContext['pgRole'],
     id: string,
     managerId: string,
     motivoRechazo?: string,
   ): Promise<any> {
-    await this.barrido(tx, tenantId);
+    await this.barrido(tx, tenantId, pgRole);
     const it = await this.obtenerAceptadaPorB(tx, tenantId, id);
     const resultado = await this.cerrarSinEjecutar(tx, it, undefined, {
       decididoPor: managerId,
@@ -119,6 +125,7 @@ export class IntercambioTurnoAplicadorService {
     tx: any,
     it: any,
     opts: { decididoPor: string | null; estadoAprobado: 'APROBADA_MANAGER' | 'AUTO_APROBADA'; motivoResolucion?: MotivoResolucionIntercambio },
+    pgRole: TenantContext['pgRole'],
   ): Promise<any> {
     const [asigA, asigB] = await Promise.all([
       tx.turnoAsignacion.findUnique({
@@ -146,7 +153,7 @@ export class IntercambioTurnoAplicadorService {
       employeeIdA: it.employeeIdA,
       employeeIdB: it.employeeIdB,
       creadoPor: opts.decididoPor ?? it.employeeIdA,
-    });
+    }, pgRole);
 
     // Claim-check optimista (hallazgo #4 revisión fase 9): dos requests
     // concurrentes pueden leer el mismo registro ACEPTADA_POR_B y llegar

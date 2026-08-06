@@ -44,8 +44,30 @@ export class EmployeesService {
     // Identificador de vista viene únicamente del mapa cerrado de arriba, nunca
     // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
     const rows = await ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
-      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "user_id" = $1`, userId,
+      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "user_id" = $1::uuid`, userId,
     );
     return rows[0] ?? null;
+  }
+
+  async findById(ctx: TenantContext, id: string): Promise<EmployeeListRow | null> {
+    const view = VIEW_BY_ROLE[ctx.pgRole];
+    if (view === null) {
+      return ctx.tx.employee.findUnique({ where: { id } });
+    }
+    const rows = await ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
+      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "id" = $1::uuid`, id,
+    );
+    return rows[0] ?? null;
+  }
+
+  async findByIds(ctx: TenantContext, ids: string[]): Promise<EmployeeListRow[]> {
+    if (ids.length === 0) return [];
+    const view = VIEW_BY_ROLE[ctx.pgRole];
+    if (view === null) {
+      return ctx.tx.employee.findMany({ where: { id: { in: ids } } });
+    }
+    return ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
+      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "id" = ANY($1::uuid[])`, ids,
+    );
   }
 }

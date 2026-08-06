@@ -140,7 +140,7 @@ export class ShiftsController {
     @Query('employeeId') employeeId?: string,
   ) {
     const ctx = getTenantContext();
-    return this.shiftPlan.obtenerPlan(ctx.tx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employeeId);
+    return this.shiftPlan.obtenerPlan(ctx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employeeId);
   }
 
   @Put('plan')
@@ -196,7 +196,7 @@ export class ShiftsController {
       employeeIdA: dto.employeeIdA,
       employeeIdB: dto.employeeIdB,
       creadoPor: userId,
-    });
+    }, ctx.pgRole);
   }
 
   @Post('compensatorios')
@@ -242,9 +242,9 @@ export class ShiftsController {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
 
-    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
     const fecha = parseFecha(dto.fecha, 'fecha');
-    const intercambio = await this.intercambios.proponer(ctx.tx, {
+    const intercambio = await this.intercambios.proponer(ctx, {
       tenantId,
       employeeIdA: empleadoA.id,
       employeeIdB: dto.employeeIdB,
@@ -273,7 +273,7 @@ export class ShiftsController {
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
-    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
     return this.intercambios.listarMisPropuestas(ctx.tx, tenantId, empleado.id);
   }
 
@@ -286,7 +286,7 @@ export class ShiftsController {
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
-    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
     return this.intercambios.listarPropuestasParaMi(ctx.tx, tenantId, empleado.id);
   }
 
@@ -299,7 +299,7 @@ export class ShiftsController {
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
-    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
     const intercambio = await this.intercambios.aceptar(ctx.tx, tenantId, id, empleado.id);
 
     try {
@@ -322,7 +322,7 @@ export class ShiftsController {
     if (!empleado) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
-    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
     const intercambio = await this.intercambios.rechazarPorB(ctx.tx, tenantId, id, empleado.id, dto?.motivoRechazo);
 
     try {
@@ -339,7 +339,7 @@ export class ShiftsController {
   async listarIntercambiosPendientes(@Req() request: Request) {
     const ctx = getTenantContext();
     const { tenantId } = requireIdentity(ctx);
-    await this.intercambiosAplicador.barrido(ctx.tx, tenantId);
+    await this.intercambiosAplicador.barrido(ctx.tx, tenantId, ctx.pgRole);
     return ctx.tx.intercambioTurno.findMany({
       where: { tenantId, estado: 'ACEPTADA_POR_B' },
       orderBy: { aceptadoEn: 'asc' },
@@ -355,7 +355,7 @@ export class ShiftsController {
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
-    return this.intercambiosAplicador.aprobar(ctx.tx, tenantId, id, manager.id);
+    return this.intercambiosAplicador.aprobar(ctx.tx, tenantId, ctx.pgRole, id, manager.id);
   }
 
   @Put('intercambios/:id/rechazar-manager')
@@ -367,7 +367,7 @@ export class ShiftsController {
     if (!manager) {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
-    return this.intercambiosAplicador.rechazarManager(ctx.tx, tenantId, id, manager.id, dto?.motivoRechazo);
+    return this.intercambiosAplicador.rechazarManager(ctx.tx, tenantId, ctx.pgRole, id, manager.id, dto?.motivoRechazo);
   }
 
   // --- Cumplimiento ---
@@ -375,14 +375,14 @@ export class ShiftsController {
   @RequirePermission('shift.read')
   async cumplimiento(@Param('periodo') periodo: string) {
     const ctx = getTenantContext();
-    return this.compliance.generarReporte(ctx.tx, periodo);
+    return this.compliance.generarReporte(ctx, periodo);
   }
 
   @Get('cumplimiento/:periodo/export')
   @RequirePermission('shift.manage')
   async exportNovedades(@Param('periodo') periodo: string) {
     const ctx = getTenantContext();
-    return { csv: await this.compliance.exportarNovedadesCsv(ctx.tx, periodo) };
+    return { csv: await this.compliance.exportarNovedadesCsv(ctx, periodo) };
   }
 
   // --- Autoservicio: el empleado ve su propio plan ---
@@ -395,7 +395,7 @@ export class ShiftsController {
       throw new BadRequestException('La sesión no tiene un empleado asociado');
     }
     return this.shiftPlan.obtenerPlan(
-      ctx.tx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employee.id,
+      ctx, parseFecha(desde, 'desde'), parseFecha(hasta, 'hasta'), employee.id,
     );
   }
 
@@ -444,7 +444,7 @@ export class ShiftsController {
     if (fechaDesde) filtros.fechaDesde = parseFecha(fechaDesde, 'fechaDesde');
     if (fechaHasta) filtros.fechaHasta = parseFecha(fechaHasta, 'fechaHasta');
 
-    const solicitudes = await this.solicitudCambioTurno.listarSolicitudes(ctx.tx, filtros);
+    const solicitudes = await this.solicitudCambioTurno.listarSolicitudes(ctx, filtros);
     return this.filtrarMotivoRechazoParaNoManagers(solicitudes, request);
   }
 
@@ -459,7 +459,7 @@ export class ShiftsController {
     }
 
     const solicitudes = await this.solicitudCambioTurno.listarMisSolicitudes(
-      ctx.tx,
+      ctx,
       tenantId,
       employee.id,
     );
@@ -572,7 +572,7 @@ export class ShiftsController {
     }
 
     const fechaEstimada = parseFecha(dto.fechaEstimada, 'fechaEstimada');
-    const solicitud = await this.solicitudTrabajoAdicional.crearSolicitud(ctx.tx, {
+    const solicitud = await this.solicitudTrabajoAdicional.crearSolicitud(ctx, {
       tenantId,
       employeeIdSolicitante: employee.id,
       employeeIdAsignado: employee.id,

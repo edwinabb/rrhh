@@ -1,4 +1,6 @@
 import { Injectable, ConflictException, BadRequestException, NotFoundException } from '@nestjs/common';
+import type { TenantContext } from '../../common/database/tenant-request-context';
+import { EmployeesService } from '../employees/employees.service';
 
 export interface CrearSolicitudInput {
   tenantId: string;
@@ -19,14 +21,30 @@ export interface FiltroSolicitudes {
   fechaHasta?: Date;
 }
 
+// El relation include "employee" original (`{ select: { nombre, email } }`)
+// referenciaba campos que no existen en el modelo (nombres/apellidos, no
+// nombre; email vive en User) y además haría un JOIN directo contra la
+// tabla base "employee", REVOKE ALL para app_manager/app_employee — se
+// resuelve aparte vía EmployeesService y se mergea en memoria.
 const INCLUDE_RELACIONES = {
-  employee: { select: { nombre: true, email: true } },
   turnoActual: true,
   turnoNuevo: true,
 };
 
 @Injectable()
 export class SolicitudCambioTurnoService {
+  constructor(private readonly employees: EmployeesService) {}
+
+  private async conEmpleados(ctx: TenantContext, solicitudes: any[]): Promise<any[]> {
+    const idsUnicos = [...new Set(solicitudes.map((s) => s.employeeId))] as string[];
+    const empleados = await this.employees.findByIds(ctx, idsUnicos);
+    const empleadosPorId = new Map(empleados.map((e) => [e.id, e]));
+    return solicitudes.map((s) => {
+      const emp = empleadosPorId.get(s.employeeId);
+      return { ...s, employee: emp ? { nombres: emp.nombres, apellidos: emp.apellidos } : null };
+    });
+  }
+
   async crearSolicitud(tx: any, input: CrearSolicitudInput): Promise<any> {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -100,8 +118,8 @@ export class SolicitudCambioTurnoService {
     });
   }
 
-  async listarSolicitudes(tx: any, filtros: FiltroSolicitudes): Promise<any[]> {
-    return tx.solicitudCambioTurno.findMany({
+  async listarSolicitudes(ctx: TenantContext, filtros: FiltroSolicitudes): Promise<any[]> {
+    const solicitudes = await ctx.tx.solicitudCambioTurno.findMany({
       where: {
         tenantId: filtros.tenantId,
         ...(filtros.estado && { estado: filtros.estado }),
@@ -117,17 +135,21 @@ export class SolicitudCambioTurnoService {
       include: INCLUDE_RELACIONES,
       orderBy: { fechaSolicitud: 'desc' },
     });
+    return this.conEmpleados(ctx, solicitudes);
   }
 
-  async listarMisSolicitudes(tx: any, tenantId: string, employeeId: string): Promise<any[]> {
-    return this.listarSolicitudes(tx, { tenantId, employeeId });
+  async listarMisSolicitudes(ctx: TenantContext, tenantId: string, employeeId: string): Promise<any[]> {
+    return this.listarSolicitudes(ctx, { tenantId, employeeId });
   }
 
-  async obtenerSolicitud(tx: any, id: string): Promise<any | null> {
-    return tx.solicitudCambioTurno.findUnique({
+  async obtenerSolicitud(ctx: TenantContext, id: string): Promise<any | null> {
+    const solicitud = await ctx.tx.solicitudCambioTurno.findUnique({
       where: { id },
       include: INCLUDE_RELACIONES,
     });
+    if (!solicitud) return null;
+    const [conEmpleado] = await this.conEmpleados(ctx, [solicitud]);
+    return conEmpleado;
   }
 
   async actualizarEstado(

@@ -61,13 +61,23 @@ function mockTx(overrides: any = {}) {
 const FECHA_FUTURA = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
 FECHA_FUTURA.setHours(0, 0, 0, 0);
 
+// EmployeesService mock: delega en tx.employee.findUnique para que los tests
+// existentes que ya controlan mockTx({ employee: {...} }) sigan funcionando
+// sin cambios (ver Group B/D del review de fase 9).
+const mockEmployees: any = {
+  findById: jest.fn((ctx: any, id: string) => ctx.tx.employee.findUnique({ where: { id } })),
+};
+function ctxOf(tx: any) {
+  return { tx, pgRole: 'app_rrhh' as const } as any;
+}
+
 describe('IntercambioTurnoService', () => {
-  const service = new IntercambioTurnoService();
+  const service = new IntercambioTurnoService(mockEmployees);
 
   describe('proponer', () => {
     it('crea la propuesta con snapshot de los turnos actuales', async () => {
       const tx = mockTx();
-      const resultado = await service.proponer(tx, {
+      const resultado = await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, mensajeA: 'Tengo cita', creadoPor: 'emp-a',
       });
@@ -80,7 +90,7 @@ describe('IntercambioTurnoService', () => {
     it('rechaza si A y B son el mismo empleado', async () => {
       const tx = mockTx();
       await expect(
-        service.proponer(tx, {
+        service.proponer(ctxOf(tx), {
           tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-a',
           fecha: FECHA_FUTURA, creadoPor: 'emp-a',
         }),
@@ -90,7 +100,7 @@ describe('IntercambioTurnoService', () => {
     it('rechaza fecha en el pasado', async () => {
       const tx = mockTx();
       await expect(
-        service.proponer(tx, {
+        service.proponer(ctxOf(tx), {
           tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
           fecha: new Date(2020, 0, 1), creadoPor: 'emp-a',
         }),
@@ -102,7 +112,7 @@ describe('IntercambioTurnoService', () => {
         turnoAsignacion: { findUnique: jest.fn().mockResolvedValue(null) },
       });
       await expect(
-        service.proponer(tx, {
+        service.proponer(ctxOf(tx), {
           tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
           fecha: FECHA_FUTURA, creadoPor: 'emp-a',
         }),
@@ -114,7 +124,7 @@ describe('IntercambioTurnoService', () => {
         employee: { findUnique: jest.fn().mockResolvedValue({ id: 'emp-a', estado: 'cesado' }) },
       });
       await expect(
-        service.proponer(tx, {
+        service.proponer(ctxOf(tx), {
           tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
           fecha: FECHA_FUTURA, creadoPor: 'emp-a',
         }),
@@ -123,12 +133,12 @@ describe('IntercambioTurnoService', () => {
 
     it('rechaza duplicado del mismo par+fecha ya pendiente', async () => {
       const tx = mockTx();
-      await service.proponer(tx, {
+      await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, creadoPor: 'emp-a',
       });
       await expect(
-        service.proponer(tx, {
+        service.proponer(ctxOf(tx), {
           tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
           fecha: FECHA_FUTURA, creadoPor: 'emp-a',
         }),
@@ -139,7 +149,7 @@ describe('IntercambioTurnoService', () => {
   describe('aceptar / rechazarPorB', () => {
     it('aceptar mueve a ACEPTADA_POR_B y setea aceptadoEn', async () => {
       const tx = mockTx();
-      const propuesta = await service.proponer(tx, {
+      const propuesta = await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, creadoPor: 'emp-a',
       });
@@ -150,7 +160,7 @@ describe('IntercambioTurnoService', () => {
 
     it('aceptar lanza si el llamante no es employeeIdB', async () => {
       const tx = mockTx();
-      const propuesta = await service.proponer(tx, {
+      const propuesta = await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, creadoPor: 'emp-a',
       });
@@ -159,7 +169,7 @@ describe('IntercambioTurnoService', () => {
 
     it('rechazarPorB mueve a RECHAZADA_POR_B con motivo', async () => {
       const tx = mockTx();
-      const propuesta = await service.proponer(tx, {
+      const propuesta = await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, creadoPor: 'emp-a',
       });
@@ -175,7 +185,7 @@ describe('IntercambioTurnoService', () => {
 
     it('aceptar sobre propuesta ya resuelta lanza BadRequestException', async () => {
       const tx = mockTx();
-      const propuesta = await service.proponer(tx, {
+      const propuesta = await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, creadoPor: 'emp-a',
       });
@@ -185,7 +195,7 @@ describe('IntercambioTurnoService', () => {
 
     it('aceptar lanza NotFoundException si el intercambio pertenece a otro tenant', async () => {
       const tx = mockTx();
-      const propuesta = await service.proponer(tx, {
+      const propuesta = await service.proponer(ctxOf(tx), {
         tenantId: 't-1', employeeIdA: 'emp-a', employeeIdB: 'emp-b',
         fecha: FECHA_FUTURA, creadoPor: 'emp-a',
       });

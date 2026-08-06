@@ -210,7 +210,7 @@ describe('ShiftsController - Cambios de Turno', () => {
       const resultado = await controller.listarSolicitudesCambio(mockRequest);
 
       expect(mockSolicitudCambioTurnoService.listarSolicitudes).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         { tenantId: 't-1' }
       );
       expect(resultado).toEqual(mockSolicitudes);
@@ -223,7 +223,7 @@ describe('ShiftsController - Cambios de Turno', () => {
       await controller.listarSolicitudesCambio(mockRequest, 'PENDIENTE');
 
       expect(mockSolicitudCambioTurnoService.listarSolicitudes).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         expect.objectContaining({
           tenantId: 't-1',
           estado: 'PENDIENTE',
@@ -238,7 +238,7 @@ describe('ShiftsController - Cambios de Turno', () => {
       await controller.listarSolicitudesCambio(mockRequest, undefined, 'emp-2');
 
       expect(mockSolicitudCambioTurnoService.listarSolicitudes).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         expect.objectContaining({
           tenantId: 't-1',
           employeeId: 'emp-2',
@@ -253,7 +253,7 @@ describe('ShiftsController - Cambios de Turno', () => {
       await controller.listarSolicitudesCambio(mockRequest, undefined, undefined, undefined, '2026-08-01', '2026-08-31');
 
       expect(mockSolicitudCambioTurnoService.listarSolicitudes).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         expect.objectContaining({
           tenantId: 't-1',
           fechaDesde: expect.any(Date),
@@ -296,7 +296,7 @@ describe('ShiftsController - Cambios de Turno', () => {
       const resultado = await controller.listarMisSolicitudesCambio(mockRequest);
 
       expect(mockSolicitudCambioTurnoService.listarMisSolicitudes).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         't-1',
         'emp-1'
       );
@@ -904,7 +904,7 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
       const resultado = await controller.solicitarTrabajoAdicional(mockManagerRequest, dto);
 
       expect(mockSolicitudTrabajoAdicionalService.crearSolicitud).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         expect.objectContaining({
           tenantId: 't-1',
           employeeIdSolicitante: 'emp-1',
@@ -954,7 +954,7 @@ describe('ShiftsController - Trabajo Fuera de Turno', () => {
       await controller.solicitarTrabajoAdicional(mockManagerRequest, dto);
 
       expect(mockSolicitudTrabajoAdicionalService.crearSolicitud).toHaveBeenCalledWith(
-        mockTenantContext.tx,
+        mockTenantContext,
         expect.objectContaining({
           employeeIdSolicitante: 'emp-1',
           employeeIdAsignado: 'emp-1',
@@ -1370,7 +1370,7 @@ describe('ShiftsController - Portal de Intercambios', () => {
   it('PUT :id/aceptar: corre el barrido antes de aceptar', async () => {
     mockIntercambios.aceptar.mockResolvedValue({ id: 'int-1', estado: 'ACEPTADA_POR_B', employeeIdA: 'emp-a', employeeIdB: 'emp-a' });
     await controller.aceptarIntercambio(mockRequestEmpleado, 'int-1');
-    expect(mockIntercambiosAplicador.barrido).toHaveBeenCalledWith(expect.anything(), 't-1');
+    expect(mockIntercambiosAplicador.barrido).toHaveBeenCalledWith(expect.anything(), 't-1', undefined);
     expect(mockIntercambios.aceptar).toHaveBeenCalled();
   });
 
@@ -1384,7 +1384,7 @@ describe('ShiftsController - Portal de Intercambios', () => {
     mockIntercambiosAplicador.rechazarManager.mockResolvedValue({ id: 'int-1', estado: 'RECHAZADA_MANAGER' });
     await controller.rechazarIntercambioManager(mockRequestManager, 'int-1', { motivoRechazo: 'Sin cobertura' });
     expect(mockIntercambiosAplicador.rechazarManager).toHaveBeenCalledWith(
-      expect.anything(), 't-1', 'int-1', 'emp-a', 'Sin cobertura',
+      expect.anything(), 't-1', undefined, 'int-1', 'emp-a', 'Sin cobertura',
     );
   });
 });

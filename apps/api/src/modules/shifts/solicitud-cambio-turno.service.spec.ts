@@ -21,7 +21,14 @@ function mockTx(overrides: any = {}) {
   };
 }
 
-const service = new SolicitudCambioTurnoService();
+// EmployeesService mock: sin empleados seed por defecto (ver Group B/D del
+// review de fase 9); las pruebas que ejercitan listarSolicitudes/etc no
+// dependen de los datos de employee, solo de que no rompa.
+const mockEmployees: any = { findByIds: jest.fn().mockResolvedValue([]) };
+function ctxOf(tx: any) {
+  return { tx, pgRole: 'app_rrhh' as const } as any;
+}
+const service = new SolicitudCambioTurnoService(mockEmployees);
 
 const TENANT = 't-1';
 const EMPLOYEE = 'emp-1';
@@ -148,7 +155,7 @@ describe('SolicitudCambioTurnoService', () => {
       const tx = mockTx();
       tx.solicitudCambioTurno.findMany.mockResolvedValue([{ id: 'sol-1', estado: 'PENDIENTE' }]);
 
-      await service.listarSolicitudes(tx, { tenantId: TENANT, estado: 'PENDIENTE' });
+      await service.listarSolicitudes(ctxOf(tx), { tenantId: TENANT, estado: 'PENDIENTE' });
 
       expect(tx.solicitudCambioTurno.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -162,7 +169,7 @@ describe('SolicitudCambioTurnoService', () => {
   describe('listarMisSolicitudes', () => {
     it('filtra por tenantId y employeeId', async () => {
       const tx = mockTx();
-      await service.listarMisSolicitudes(tx, TENANT, EMPLOYEE);
+      await service.listarMisSolicitudes(ctxOf(tx), TENANT, EMPLOYEE);
 
       expect(tx.solicitudCambioTurno.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -175,7 +182,7 @@ describe('SolicitudCambioTurnoService', () => {
   describe('obtenerSolicitud', () => {
     it('retorna null si no existe', async () => {
       const tx = mockTx();
-      const resultado = await service.obtenerSolicitud(tx, 'sol-999');
+      const resultado = await service.obtenerSolicitud(ctxOf(tx), 'sol-999');
       expect(resultado).toBeNull();
     });
   });

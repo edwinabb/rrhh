@@ -1,4 +1,6 @@
 import { Injectable, BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import type { TenantContext } from '../../common/database/tenant-request-context';
+import { EmployeesService } from '../employees/employees.service';
 
 export type TipoDiaPlan = 'TURNO' | 'DESCANSO' | 'DESCANSO_COMPENSATORIO';
 export type EstadoIntercambioTurno =
@@ -38,7 +40,10 @@ const ESTADOS_NO_TERMINALES: readonly EstadoIntercambioTurno[] = [
  */
 @Injectable()
 export class IntercambioTurnoService {
-  async proponer(tx: any, input: ProponerIntercambioInput): Promise<any> {
+  constructor(private readonly employees: EmployeesService) {}
+
+  async proponer(ctx: TenantContext, input: ProponerIntercambioInput): Promise<any> {
+    const tx = ctx.tx;
     if (input.employeeIdA === input.employeeIdB) {
       throw new BadRequestException('Un empleado no puede proponerse un intercambio a sí mismo');
     }
@@ -50,8 +55,8 @@ export class IntercambioTurnoService {
     }
 
     const [empA, empB] = await Promise.all([
-      tx.employee.findUnique({ where: { id: input.employeeIdA } }),
-      tx.employee.findUnique({ where: { id: input.employeeIdB } }),
+      this.employees.findById(ctx, input.employeeIdA),
+      this.employees.findById(ctx, input.employeeIdB),
     ]);
     if (!empA || empA.estado !== 'activo') {
       throw new BadRequestException('El empleado A no está activo');
@@ -86,7 +91,7 @@ export class IntercambioTurnoService {
         employeeIdA: input.employeeIdA,
         employeeIdB: input.employeeIdB,
         fecha: input.fecha,
-        estado: { in: ESTADOS_NO_TERMINALES },
+        estado: { in: [...ESTADOS_NO_TERMINALES] },
       },
     });
     if (duplicado) {

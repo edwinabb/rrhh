@@ -1,5 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { NormativeParameterService } from '../normative-params/normative-parameter.service';
+import type { TenantContext } from '../../common/database/tenant-request-context';
+import { EmployeesService } from '../employees/employees.service';
 
 export interface ReporteEmpleado {
   employeeId: string;
@@ -46,9 +48,13 @@ function lunesDe(fecha: Date): Date {
  */
 @Injectable()
 export class ShiftComplianceService {
-  constructor(private readonly normativeParams?: NormativeParameterService) {}
+  constructor(
+    private readonly employees: EmployeesService,
+    private readonly normativeParams?: NormativeParameterService,
+  ) {}
 
-  async generarReporte(tx: any, periodo: string): Promise<ReporteCumplimiento> {
+  async generarReporte(ctx: TenantContext, periodo: string): Promise<ReporteCumplimiento> {
+    const tx = ctx.tx;
     if (!PERIODO_REGEX.test(periodo)) {
       throw new BadRequestException(`Período inválido: "${periodo}" (formato YYYY-MM)`);
     }
@@ -63,11 +69,14 @@ export class ShiftComplianceService {
         JORNADA_SEMANAL_MAXIMA_DEFAULT)
       : JORNADA_SEMANAL_MAXIMA_DEFAULT;
 
+    // tx.employee.findMany({}) haría una lectura directa contra la tabla base
+    // "employee", REVOKE ALL para app_manager/app_employee — se resuelve vía
+    // EmployeesService (vistas por rol), igual que en obtenerPlan.
     const [asignaciones, resumenes, movimientos, empleados, contratos] = await Promise.all([
       tx.turnoAsignacion.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
       tx.asistenciaResumen.findMany({ where: { fecha: { gte: desde, lte: hasta } } }),
       tx.compensatorioMovimiento.findMany({}),
-      tx.employee.findMany({}),
+      this.employees.list(ctx),
       tx.contrato.findMany({ where: { personalDeConfianza: true } }),
     ]);
     const idsConfianza = new Set<string>(contratos.map((c: any) => c.employeeId));
@@ -185,8 +194,8 @@ export class ShiftComplianceService {
     return { periodo, empleados: reporte };
   }
 
-  async exportarNovedadesCsv(tx: any, periodo: string): Promise<string> {
-    const { empleados } = await this.generarReporte(tx, periodo);
+  async exportarNovedadesCsv(ctx: TenantContext, periodo: string): Promise<string> {
+    const { empleados } = await this.generarReporte(ctx, periodo);
     const filas = empleados.map(
       (e) => `${e.numeroDocumento},${e.diasTrabajados},,,,`,
     );

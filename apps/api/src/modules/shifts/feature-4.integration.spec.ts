@@ -86,6 +86,16 @@ function fechaFutura(dias: number): Date {
   return d;
 }
 
+// EmployeesService mock: delega en tx.employee.findUnique (ver Group B/D del
+// review de fase 9 — EmployeesService resuelve la lectura de empleado bajo
+// RLS, pero en estos fakes no hay RLS que simular, solo la superficie).
+const mockEmployees: any = {
+  findById: jest.fn((ctx: any, id: string) => ctx.tx.employee.findUnique({ where: { id } })),
+};
+function ctxOf(tx: any) {
+  return { tx, pgRole: 'app_rrhh' as const } as any;
+}
+
 describe('Feature 4: Portal de Intercambios (E2E)', () => {
   let notificationService: any;
   let intercambios: IntercambioTurnoService;
@@ -96,8 +106,8 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
       notificarIntercambioAprobado: jest.fn().mockResolvedValue(undefined),
       notificarIntercambioRechazado: jest.fn().mockResolvedValue(undefined),
     };
-    intercambios = new IntercambioTurnoService();
-    aplicador = new IntercambioTurnoAplicadorService(new CompensatorioService(), notificationService);
+    intercambios = new IntercambioTurnoService(mockEmployees);
+    aplicador = new IntercambioTurnoAplicadorService(new CompensatorioService(mockEmployees), notificationService);
   });
 
   it('flujo principal: A propone, B acepta, Manager aprueba → turnos intercambiados', async () => {
@@ -109,7 +119,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO', turnoId: 'turno-dia' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'TURNO', turnoId: 'turno-noche' });
 
-    const propuesta = await intercambios.proponer(tx, {
+    const propuesta = await intercambios.proponer(ctxOf(tx), {
       tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, mensajeA: 'Tengo cita', creadoPor: 'emp-a',
     });
     expect(propuesta.estado).toBe('PENDIENTE_ACEPTACION_B');
@@ -117,7 +127,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     const aceptada = await intercambios.aceptar(tx, tenantId, propuesta.id, 'emp-b');
     expect(aceptada.estado).toBe('ACEPTADA_POR_B');
 
-    const aprobada = await aplicador.aprobar(tx, tenantId, propuesta.id, 'mgr-1');
+    const aprobada = await aplicador.aprobar(tx, tenantId, 'app_rrhh', propuesta.id, 'mgr-1');
     expect(aprobada.estado).toBe('APROBADA_MANAGER');
     expect(aprobada.decididoPor).toBe('mgr-1');
 
@@ -138,7 +148,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'DESCANSO' });
 
-    const propuesta = await intercambios.proponer(tx, {
+    const propuesta = await intercambios.proponer(ctxOf(tx), {
       tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a',
     });
     const rechazada = await intercambios.rechazarPorB(tx, tenantId, propuesta.id, 'emp-b', 'No puedo');
@@ -156,14 +166,14 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO', turnoId: 'turno-dia' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'TURNO', turnoId: 'turno-noche' });
 
-    const propuesta = await intercambios.proponer(tx, {
+    const propuesta = await intercambios.proponer(ctxOf(tx), {
       tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a',
     });
     await intercambios.aceptar(tx, tenantId, propuesta.id, 'emp-b');
     // Simula que aceptó hace 49h (más allá del plazo de 48h)
     tx._intercambios.get(propuesta.id).aceptadoEn = new Date(Date.now() - 49 * 60 * 60 * 1000);
 
-    await aplicador.barrido(tx, tenantId);
+    await aplicador.barrido(tx, tenantId, 'app_rrhh');
 
     const resuelta = tx._intercambios.get(propuesta.id);
     expect(resuelta.estado).toBe('AUTO_APROBADA');
@@ -181,7 +191,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO', turnoId: 'turno-dia' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'TURNO', turnoId: 'turno-noche' });
 
-    const propuesta = await intercambios.proponer(tx, {
+    const propuesta = await intercambios.proponer(ctxOf(tx), {
       tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a',
     });
     await intercambios.aceptar(tx, tenantId, propuesta.id, 'emp-b');
@@ -191,7 +201,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fechaFutura(0)), tx._asignaciones.get(tx._keyAsig('emp-a', fecha)));
     tx._asignaciones.set(tx._keyAsig('emp-b', fechaFutura(0)), tx._asignaciones.get(tx._keyAsig('emp-b', fecha)));
 
-    await aplicador.barrido(tx, tenantId);
+    await aplicador.barrido(tx, tenantId, 'app_rrhh');
 
     const resuelta = tx._intercambios.get(propuesta.id);
     expect(resuelta.estado).toBe('AUTO_APROBADA');
@@ -207,7 +217,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO', turnoId: 'turno-dia' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'TURNO', turnoId: 'turno-noche' });
 
-    const propuesta = await intercambios.proponer(tx, {
+    const propuesta = await intercambios.proponer(ctxOf(tx), {
       tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a',
     });
     await intercambios.aceptar(tx, tenantId, propuesta.id, 'emp-b');
@@ -215,7 +225,7 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     // El manager reasigna a A a DESCANSO esa fecha antes de que se apruebe el intercambio.
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'DESCANSO' });
 
-    const resultado = await aplicador.aprobar(tx, tenantId, propuesta.id, 'mgr-1');
+    const resultado = await aplicador.aprobar(tx, tenantId, 'app_rrhh', propuesta.id, 'mgr-1');
 
     expect(resultado.estado).toBe('RECHAZADA_AUTOMATICA');
     expect(resultado.motivoResolucion).toBe('TURNO_MODIFICADO');
@@ -231,13 +241,13 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'TURNO' });
 
-    const propuesta = await intercambios.proponer(tx, {
+    const propuesta = await intercambios.proponer(ctxOf(tx), {
       tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a',
     });
     // B nunca responde. La fecha del turno llega.
     tx._intercambios.get(propuesta.id).fecha = fechaFutura(0);
 
-    await aplicador.barrido(tx, tenantId);
+    await aplicador.barrido(tx, tenantId, 'app_rrhh');
 
     const resuelta = tx._intercambios.get(propuesta.id);
     expect(resuelta.estado).toBe('RECHAZADA_AUTOMATICA');
@@ -253,10 +263,10 @@ describe('Feature 4: Portal de Intercambios (E2E)', () => {
     tx._asignaciones.set(tx._keyAsig('emp-a', fecha), { id: 'asig-a', tipoDia: 'TURNO' });
     tx._asignaciones.set(tx._keyAsig('emp-b', fecha), { id: 'asig-b', tipoDia: 'TURNO' });
 
-    await intercambios.proponer(tx, { tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a' });
+    await intercambios.proponer(ctxOf(tx), { tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a' });
 
     await expect(
-      intercambios.proponer(tx, { tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a' }),
+      intercambios.proponer(ctxOf(tx), { tenantId, employeeIdA: 'emp-a', employeeIdB: 'emp-b', fecha, creadoPor: 'emp-a' }),
     ).rejects.toThrow(/pendiente/);
   });
 });

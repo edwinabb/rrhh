@@ -56,6 +56,12 @@ function asignacion(tipoDia = 'TURNO') {
   return { id: `asig-${Math.random()}`, tipoDia, turnoId: 'turno-x' };
 }
 
+// EmployeesService mock: delega en tx.employee.findUnique (ver Group B/D del
+// review de fase 9).
+const mockEmployees: any = {
+  findById: jest.fn((ctx: any, id: string) => ctx.tx.employee.findUnique({ where: { id } })),
+};
+
 describe('IntercambioTurnoAplicadorService', () => {
   let notificationService: any;
   let service: IntercambioTurnoAplicadorService;
@@ -65,7 +71,7 @@ describe('IntercambioTurnoAplicadorService', () => {
       notificarIntercambioAprobado: jest.fn().mockResolvedValue(undefined),
       notificarIntercambioRechazado: jest.fn().mockResolvedValue(undefined),
     };
-    service = new IntercambioTurnoAplicadorService(new CompensatorioService(), notificationService);
+    service = new IntercambioTurnoAplicadorService(new CompensatorioService(mockEmployees), notificationService);
   });
 
   describe('aprobar (decisión del manager)', () => {
@@ -75,7 +81,7 @@ describe('IntercambioTurnoAplicadorService', () => {
         asignaciones: { 'emp-a|2026-09-10': asignacion(), 'emp-b|2026-09-10': asignacion() },
       });
 
-      const resultado = await service.aprobar(tx, 't-1', 'int-1', 'mgr-1');
+      const resultado = await service.aprobar(tx, 't-1', 'app_rrhh', 'int-1', 'mgr-1');
 
       expect(resultado.estado).toBe('APROBADA_MANAGER');
       expect(resultado.decididoPor).toBe('mgr-1');
@@ -90,7 +96,7 @@ describe('IntercambioTurnoAplicadorService', () => {
         asignaciones: { 'emp-a|2026-09-10': asignacion('DESCANSO'), 'emp-b|2026-09-10': asignacion() },
       });
 
-      const resultado = await service.aprobar(tx, 't-1', 'int-1', 'mgr-1');
+      const resultado = await service.aprobar(tx, 't-1', 'app_rrhh', 'int-1', 'mgr-1');
 
       expect(resultado.estado).toBe('RECHAZADA_AUTOMATICA');
       expect(resultado.motivoResolucion).toBe('TURNO_MODIFICADO');
@@ -99,19 +105,19 @@ describe('IntercambioTurnoAplicadorService', () => {
 
     it('lanza BadRequestException si ya no está en ACEPTADA_POR_B', async () => {
       const tx = mockTx({ intercambios: { 'int-1': intercambio({ estado: 'RECHAZADA_POR_B' }) } });
-      await expect(service.aprobar(tx, 't-1', 'int-1', 'mgr-1')).rejects.toThrow(BadRequestException);
+      await expect(service.aprobar(tx, 't-1', 'app_rrhh', 'int-1', 'mgr-1')).rejects.toThrow(BadRequestException);
     });
 
     it('lanza NotFoundException si el id no existe', async () => {
       const tx = mockTx();
-      await expect(service.aprobar(tx, 't-1', 'no-existe', 'mgr-1')).rejects.toThrow(NotFoundException);
+      await expect(service.aprobar(tx, 't-1', 'app_rrhh', 'no-existe', 'mgr-1')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('rechazarManager', () => {
     it('cierra como RECHAZADA_MANAGER sin ejecutar el swap', async () => {
       const tx = mockTx({ intercambios: { 'int-1': intercambio() } });
-      const resultado = await service.rechazarManager(tx, 't-1', 'int-1', 'mgr-1', 'No hay cobertura');
+      const resultado = await service.rechazarManager(tx, 't-1', 'app_rrhh', 'int-1', 'mgr-1', 'No hay cobertura');
       expect(resultado.estado).toBe('RECHAZADA_MANAGER');
       expect(resultado.motivoRechazo).toBe('No hay cobertura');
       expect(tx.turnoAsignacion.update).not.toHaveBeenCalled();
@@ -131,7 +137,7 @@ describe('IntercambioTurnoAplicadorService', () => {
         },
       });
 
-      await service.barrido(tx, 't-1');
+      await service.barrido(tx, 't-1', 'app_rrhh');
 
       const actualizado = await tx.intercambioTurno.findUnique({ where: { id: 'int-1' } });
       expect(actualizado.estado).toBe('AUTO_APROBADA');
@@ -150,7 +156,7 @@ describe('IntercambioTurnoAplicadorService', () => {
         },
       });
 
-      await service.barrido(tx, 't-1');
+      await service.barrido(tx, 't-1', 'app_rrhh');
 
       const actualizado = await tx.intercambioTurno.findUnique({ where: { id: 'int-1' } });
       expect(actualizado.estado).toBe('AUTO_APROBADA');
@@ -164,7 +170,7 @@ describe('IntercambioTurnoAplicadorService', () => {
         intercambios: { 'int-1': intercambio({ estado: 'PENDIENTE_ACEPTACION_B', fecha: hoy, aceptadoEn: null }) },
       });
 
-      await service.barrido(tx, 't-1');
+      await service.barrido(tx, 't-1', 'app_rrhh');
 
       const actualizado = await tx.intercambioTurno.findUnique({ where: { id: 'int-1' } });
       expect(actualizado.estado).toBe('RECHAZADA_AUTOMATICA');
@@ -178,7 +184,7 @@ describe('IntercambioTurnoAplicadorService', () => {
         intercambios: { 'int-1': intercambio({ fecha: fechaFutura, aceptadoEn: haceUnaHora }) },
       });
 
-      await service.barrido(tx, 't-1');
+      await service.barrido(tx, 't-1', 'app_rrhh');
 
       const actualizado = await tx.intercambioTurno.findUnique({ where: { id: 'int-1' } });
       expect(actualizado.estado).toBe('ACEPTADA_POR_B');
@@ -197,7 +203,7 @@ describe('IntercambioTurnoAplicadorService', () => {
 
       // El manager llama aprobar() DESPUÉS de que el barrido (corrido dentro
       // del mismo aprobar()) ya resolvió automáticamente por FECHA_ALCANZADA.
-      await expect(service.rechazarManager(tx, 't-1', 'int-1', 'mgr-1')).rejects.toThrow(
+      await expect(service.rechazarManager(tx, 't-1', 'app_rrhh', 'int-1', 'mgr-1')).rejects.toThrow(
         /ya no está pendiente/,
       );
     });
