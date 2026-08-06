@@ -389,6 +389,19 @@ async function seedDemoTenant() {
     }
   }
 
+  // Seed default export config for payroll export feature
+  await prisma.tenantPayrollExportConfig.upsert({
+    where: { tenantId: tenant.id },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      montoMode: 'devengado_igual_pagado',
+      formatoExportar: 'pipe',
+      conceptosExcluidos: ['0100', '0200', '0300', '0400', '0500', '0600'], // totales calculados
+      camposSensibles: [],
+    },
+  });
+
   console.log(`  Tenant demo: ${tenant.razonSocial} (RUC ${tenant.ruc})`);
   console.log('  Usuarios: admin@demo.pe / Admin123! · rrhh@demo.pe / Rrhh123! · empleado@demo.pe / Empleado123!');
 }
