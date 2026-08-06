@@ -1,6 +1,6 @@
 # Pendientes y Plan de Trabajo
 
-**Actualizado:** 2026-08-06 (Sprint 9 mergeado a `master`, v1.5.0) · **Estado del sistema:** todo verde en `master` (548 tests, 0 errores TypeScript en api + web) — Sprint 6 ✅ (Feature 1 Patrones) + Sprint 7 ✅ (Feature 2 Cambios) + Sprint 8 ✅ (Feature 3 Trabajo Fuera de Turno) + Sprint 9 ✅ (Feature 4 Intercambios) — 4/4 features de Fases 6-9 completadas.
+**Actualizado:** 2026-08-06 (Sprint 9 cerrado 100%, v1.5.0 — release + cleanup de rama/worktree) · **Estado del sistema:** todo verde en `master` (548 tests, 0 errores TypeScript en api + web) — Sprint 6 ✅ (Feature 1 Patrones) + Sprint 7 ✅ (Feature 2 Cambios) + Sprint 8 ✅ (Feature 3 Trabajo Fuera de Turno) + Sprint 9 ✅ (Feature 4 Intercambios) — 4/4 features de Fases 6-9 completadas. **Próximo paso planeado:** coordinador autónomo de backlog, ver `docs/superpowers/plans/2026-08-05-autonomous-backlog-coordinator-plan.md`.
 
 ---
 
@@ -29,9 +29,9 @@
 ## 📌 Próximos pasos inmediatos
 
 - **Sprint 8 cerrado (2026-08-04):** los 11 commits (`02c647c..bbd144f`) ya vivían directamente en `master` (no hubo rama/PR separada — se trabajó ahí desde el inicio), así que no hizo falta merge. Se hizo el bump de versión a `v1.4.0` + commit `release:` + tag, y se limpió el directorio huérfano `.worktrees/feat-turnos-trabajo-extra-fase-8` (no era un worktree registrado, solo quedaba el directorio vacío en disco).
-- `master` está al día con `origin/master` (push + tag `v1.4.0` ya hechos).
-- **Sprint 9 (Feature 4: Portal de Intercambios) mergeado a `master` (2026-08-06)** — PR #2 (`feat/turnos-intercambios-fase-9` → `master`, merge commit `adaa82b`), tras un fix wave adicional de 2 commits (`601f4b0`, `e2413d5`) surgido de una prueba manual E2E contra Postgres real y una revisión final de rama. Bump de versión a `v1.5.0` (4/4 features de Fases 6-9 completadas). Worktree `.worktrees/feat-turnos-intercambios-fase-9` y rama remota siguen vivos hasta limpieza manual.
-- **Próximo ítem de mayor valor:** retomar el punto 1 de "Plan de integración post-turnos" (exportes de nómina a la BD real) — fuera del módulo de turnos, es lo de mayor valor pendiente.
+- **Sprint 9 (Feature 4: Portal de Intercambios) 100% cerrado (2026-08-06):** PR #2 (`feat/turnos-intercambios-fase-9` → `master`, merge commit `adaa82b`) mergeado, tras un fix wave adicional de 2 commits (`601f4b0`, `e2413d5`) surgido de una prueba manual E2E contra Postgres real y una revisión final de rama independiente — ver "Sprint 9 fix wave adicional" en Deuda Técnica más abajo. Bump de versión a `v1.5.0`, tag pusheado (4/4 features de Fases 6-9 completadas). Rama remota `feat/turnos-intercambios-fase-9` borrada; worktree local desregistrado de git (puede quedar la carpeta huérfana en disco en `.worktrees/feat-turnos-intercambios-fase-9`, no es un worktree válido, se borra a mano cuando se pueda: `rm -rf`).
+- `master` está al día con `origin/master` (push + tag `v1.5.0` ya hechos).
+- **Próximo paso planeado — coordinador autónomo de backlog:** ver `docs/superpowers/plans/2026-08-05-autonomous-backlog-coordinator-plan.md` (plan confirmado con el usuario, incluye 7 supuestos ya validados y la restricción dura de nunca borrar campos/tablas ni alterar procesos de negocio aprobados sin dejarlo registrado para aprobación humana) y `docs/superpowers/plans/autonomous-coordinator-status.md` (estado — Fase 0 completa, Fase 1+ aún no lanzada). Recorre este mismo backlog priorizado de abajo hacia arriba, ítem por ítem, vía `subagent-driven-development`, empezando por el punto 1 de "Plan de integración post-turnos" (exportes de nómina a la BD real) — es el ítem de mayor valor pendiente fuera del módulo de turnos.
 
 ---
 
