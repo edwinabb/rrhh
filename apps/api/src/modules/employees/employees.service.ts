@@ -14,6 +14,18 @@ const VIEW_BY_ROLE: Record<TenantContext['pgRole'], string | null> = {
   app_employee: 'employee_view_employee',
 };
 
+// SELECT * devuelve las columnas de la vista en snake_case; Prisma (y todo el
+// código que consume EmployeeListRow) espera camelCase. Cada vista expone un
+// subconjunto distinto de columnas (ver migración 20260710000000_init_foundations,
+// sección 4), así que el alias va por vista, no un "SELECT *, userId AS ..." genérico.
+const SELECT_COLUMNS: Record<'employee_view_manager' | 'employee_view_employee', string> = {
+  employee_view_manager: `"id", "tenant_id" AS "tenantId", "sede_id" AS "sedeId", "user_id" AS "userId",
+    "manager_id" AS "managerId", "tipo_documento" AS "tipoDocumento", "numero_documento" AS "numeroDocumento",
+    "nombres", "apellidos", "estado", "created_at" AS "createdAt"`,
+  employee_view_employee: `"id", "tenant_id" AS "tenantId", "sede_id" AS "sedeId", "user_id" AS "userId",
+    "manager_id" AS "managerId", "nombres", "apellidos", "estado"`,
+};
+
 export interface EmployeeListRow {
   id: string;
   nombres: string;
@@ -32,7 +44,7 @@ export class EmployeesService {
     // Identificador de vista viene únicamente del mapa cerrado de arriba, nunca
     // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
     return ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
-      `SELECT *, "user_id" AS "userId" FROM "${view}"`,
+      `SELECT ${SELECT_COLUMNS[view as keyof typeof SELECT_COLUMNS]} FROM "${view}"`,
     );
   }
 
@@ -44,7 +56,7 @@ export class EmployeesService {
     // Identificador de vista viene únicamente del mapa cerrado de arriba, nunca
     // de input externo — seguro pese a ser SQL "unsafe" en el nombre de tabla.
     const rows = await ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
-      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "user_id" = $1::uuid`, userId,
+      `SELECT ${SELECT_COLUMNS[view as keyof typeof SELECT_COLUMNS]} FROM "${view}" WHERE "user_id" = $1::uuid`, userId,
     );
     return rows[0] ?? null;
   }
@@ -55,7 +67,7 @@ export class EmployeesService {
       return ctx.tx.employee.findUnique({ where: { id } });
     }
     const rows = await ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
-      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "id" = $1::uuid`, id,
+      `SELECT ${SELECT_COLUMNS[view as keyof typeof SELECT_COLUMNS]} FROM "${view}" WHERE "id" = $1::uuid`, id,
     );
     return rows[0] ?? null;
   }
@@ -67,7 +79,7 @@ export class EmployeesService {
       return ctx.tx.employee.findMany({ where: { id: { in: ids } } });
     }
     return ctx.tx.$queryRawUnsafe<EmployeeListRow[]>(
-      `SELECT *, "user_id" AS "userId" FROM "${view}" WHERE "id" = ANY($1::uuid[])`, ids,
+      `SELECT ${SELECT_COLUMNS[view as keyof typeof SELECT_COLUMNS]} FROM "${view}" WHERE "id" = ANY($1::uuid[])`, ids,
     );
   }
 }

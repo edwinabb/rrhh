@@ -147,19 +147,15 @@ export class IntercambioTurnoAplicadorService {
       return this.cerrarSinEjecutar(tx, it, 'TURNO_MODIFICADO');
     }
 
-    const { a, b } = await this.compensatorios.intercambiar(tx, {
-      tenantId: it.tenantId,
-      fecha: it.fecha,
-      employeeIdA: it.employeeIdA,
-      employeeIdB: it.employeeIdB,
-      creadoPor: opts.decididoPor ?? it.employeeIdA,
-    }, pgRole);
-
     // Claim-check optimista (hallazgo #4 revisión fase 9): dos requests
     // concurrentes pueden leer el mismo registro ACEPTADA_POR_B y llegar
     // ambos hasta acá. El UPDATE condicionado a que el estado siga siendo
     // el que leímos (it.estado) hace que solo el primero en escribir gane;
     // el segundo ve count === 0 y no duplica la marca ni la notificación.
+    // Debe ejecutarse ANTES de swapear turnoAsignacion: si el swap corriera
+    // primero, el perdedor de la carrera también revertiría A↔B antes de
+    // ver count === 0, dejando las asignaciones en el estado post-swap del
+    // perdedor en vez de las del ganador (hallazgo revisión final fase 9).
     const claim = await tx.intercambioTurno.updateMany({
       where: { id: it.id, estado: it.estado },
       data: {
@@ -167,8 +163,6 @@ export class IntercambioTurnoAplicadorService {
         motivoResolucion: opts.motivoResolucion ?? null,
         decididoPor: opts.decididoPor,
         decididoEn: new Date(),
-        turnoAsignacionAId: a.id,
-        turnoAsignacionBId: b.id,
       },
     });
 
@@ -178,6 +172,19 @@ export class IntercambioTurnoAplicadorService {
       );
       return null;
     }
+
+    const { a, b } = await this.compensatorios.intercambiar(tx, {
+      tenantId: it.tenantId,
+      fecha: it.fecha,
+      employeeIdA: it.employeeIdA,
+      employeeIdB: it.employeeIdB,
+      creadoPor: opts.decididoPor ?? it.employeeIdA,
+    }, pgRole);
+
+    await tx.intercambioTurno.update({
+      where: { id: it.id },
+      data: { turnoAsignacionAId: a.id, turnoAsignacionBId: b.id },
+    });
 
     const actualizado = await tx.intercambioTurno.findUnique({ where: { id: it.id } });
 
