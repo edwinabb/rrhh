@@ -2,17 +2,20 @@
 
 Sistema full-stack de gestión de recursos humanos (HRMS) para empresas peruanas con **cumplimiento estricto de normativa local** (SUNAT, SUNAFIL, MTPE). Multi-empresa (multi-tenant), soporta múltiples regímenes laborales y escala de 10 a 5,000 trabajadores.
 
-## 📋 Fases del Proyecto
+**🎉 Estado Actual:** MVP v1.5.0 OPERATIVO Y LISTO PARA PRODUCCIÓN (Agosto 6, 2026)
+
+## 📊 Fases del Proyecto
 
 | Fase | Módulo | Estado | Tests |
 |------|--------|--------|-------|
-| **0** | Fundaciones (Auth, RBAC, Multi-tenancy, Auditoría) | ✅ Completada | 6 |
-| **1** | Nómina (CTS, gratificaciones, quinta categoría, SUNAT) | ✅ Completada | 37 |
-| **2** | Asistencia (Marcaciones append-only, geofencing, horas extra) | ✅ Completada (feature-complete) | 78 |
-| **3** | Documental (Legajo digital, MinIO, versionado, Ley 29733) | ✅ Completada (MVP) | 24 |
-| **4** | ATS/Reclutamiento (Vacantes, parsing CVs con Claude API) | ✅ Completada (MVP) | 37 |
+| **0** | Fundaciones (Auth, RBAC, Multi-tenancy, Auditoría) | ✅ v1.0 | 45 |
+| **1** | Nómina (CTS, gratificaciones, SUNAT E18, BCP telecrédito) | ✅ v1.5 | 96 |
+| **2** | Asistencia (Marcaciones, horas extra, resumen) | ✅ v1.5 | 82 |
+| **3** | Documental (Legajo digital, MinIO, versionado) | ✅ v1.5 | 48 |
+| **4** | ATS (Vacantes, candidatos, flujo simplificado MVP) | ✅ v1.5 | 37 |
+| **5-9** | Turnos (Patrones, cambios, intercambios, trabajo extra) | ✅ v1.5 | 275 |
 
-**Total: 208 tests unitarios pasando (26 suites), TDD estricto. Frontend completo (8 páginas con RBAC) + import/export CSV para sistemas de asistencia externos.**
+**✅ Total: 583 tests (100% passing), 0 errores TypeScript, build web exitoso. MVP COMPLETO listo para presentación a RRH.**
 
 ## 🚀 Inicio Rápido
 

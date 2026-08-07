@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { login } from '@/lib/api-client';
 
 export default function LoginPage() {
@@ -29,12 +28,10 @@ export default function LoginPage() {
       {/* COLUMNA IZQUIERDA - IMAGEN */}
       <div className="hidden relative flex-1 overflow-hidden bg-gradient-to-br from-blue-500 to-purple-600 lg:flex lg:items-center lg:justify-center">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 to-purple-600/30 z-10"></div>
-        <Image
+        <img
           src="/login-sistema.jpg"
           alt="Sistema RRHH"
-          fill
-          className="object-cover"
-          priority
+          className="w-full h-full object-cover"
         />
       </div>
 

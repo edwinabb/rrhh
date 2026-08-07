@@ -2,9 +2,9 @@
 
 Sistema de Gestión de Recursos Humanos (HRMS) para empresas peruanas, multi-empresa (multi-tenant) y con cumplimiento estricto de la normativa local (SUNAT, SUNAFIL, MTPE, Ley 29733).
 
-**Estado:** Backend Fases 0–5 + módulo de cese y liquidación · 284 tests unitarios (35 suites) · Frontend completo (11 páginas) · Import/export CSV para sistemas externos
+**Estado:** ✅ MVP v1.5.0 OPERATIVO (Agosto 6-7, 2026) · Backend Fases 0-9 + cese/liquidación · 583 tests (100% passing, 0 TypeScript errors) · Frontend completo (12 páginas) · Build successful · Ready for RRH
 
-**Repositorio:** https://github.com/edwinabb/rrhh
+**Repositorio:** https://github.com/edwinabb/rrhh · **Demo:** `localhost:3000` (Web) | `localhost:3001/api` (API)
 
 ---
 
@@ -265,4 +265,34 @@ Ver el detalle priorizado en `docs/PENDIENTES.md`. Titulares:
 
 ---
 
-*Documento actualizado el 2026-07-17 con el módulo de cese y liquidación (rama `feat/liquidacion-cese`).*
+---
+
+## 🎯 Completado en Sesión Final (Agosto 6-7, 2026)
+
+**Sprints 6-9 — Turnos con Autoservicio (275 tests, Feature 2-4):**
+1. **Sprint 6:** Patrones de Rotación — gestión de patrones recurrentes, aplicación masiva con preview
+2. **Sprint 7:** Cambios de Turno — solicitud por empleado, gestión por manager, reintento automático
+3. **Sprint 8:** Trabajo Fuera de Turno — reporte con fotos/timestamp, validación de director, compensatorios
+4. **Sprint 9:** Portal de Intercambios — propuesta empleado ↔ empleado, aprobación manager, neutralidad compensatoria
+
+**Critical Fixes (Agosto 6):**
+- Blocker: tests con fechas relativas en Feature 2 & 3 (583 tests → 100% passing)
+- Simplificación ATS: removida dependencia Claude API → MVP manual form + RRH approval
+- Login redesign: dos columnas (imagen + formulario), logo YOFC, versión v1.5.0
+- Webpack error fix: reemplazado Next.js Image con img estándar
+
+**Documentación (Agosto 6-7):**
+- README.md: estado MVP v1.5.0, matriz de fases, 583 tests, build success
+- RESUMEN_SISTEMA.md: actualizado stack, features, endpoints, cumplimiento normativo
+- PENDIENTES.md: "MVP OPERATIVO Y LISTO PARA RRH" + plan siguiente fase
+- Mockups: login redesign (MD + HTML visuales)
+- ESTADO_SISTEMA_v1.5.0: documentación completa para presentación RRH (300+ líneas)
+
+**Credenciales de acceso:**
+- Admin: `admin@demo.pe` / `Admin123!`
+- RRHH: `rrhh@demo.pe` / `Rrhh123!`
+- Employee: `empleado@demo.pe` / `Empleado123!`
+
+---
+
+*Documento actualizado el 2026-08-07 — MVP v1.5.0 OPERATIVO. Sesión final de construcción completada.*
